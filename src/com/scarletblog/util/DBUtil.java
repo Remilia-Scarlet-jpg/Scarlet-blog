@@ -19,8 +19,7 @@ public class DBUtil {
         "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
-        + "&sslMode=REQUIRED"
-        + "&tlsVersions=TLSv1.2,TLSv1.3"
+        + "&sslMode=DISABLED"
         + "&connectTimeout=20000"
         + "&socketTimeout=20000";
     private static final String USER = DB_USER;
