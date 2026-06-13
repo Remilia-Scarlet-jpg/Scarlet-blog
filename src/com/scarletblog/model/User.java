@@ -10,6 +10,7 @@ public class User {
     private String username;   // 名札
     private String password;   // 封印密语 (hashed)
     private String nickname;   // 称呼
+    private String avatar;     // 头像图片路径
     private String role;       // 身份: 馆主/女仆长/住人
     private Timestamp createdAt;
 
@@ -27,6 +28,9 @@ public class User {
 
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
+
+    public String getAvatar() { return avatar; }
+    public void setAvatar(String avatar) { this.avatar = avatar; }
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }

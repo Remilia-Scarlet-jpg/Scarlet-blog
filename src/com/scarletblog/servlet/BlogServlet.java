@@ -8,15 +8,31 @@ import com.scarletblog.model.Comment;
 import com.scarletblog.model.Category;
 import com.scarletblog.model.User;
 
+import com.scarletblog.util.SecurityUtil;
+
 import javax.servlet.ServletException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.*;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.security.SecureRandom;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 红魔馆博客 - 主控制器 Servlet
  * 处理所有 /blog/* 和 /api/* 请求
  */
+@MultipartConfig(
+    maxFileSize = 5 * 1024 * 1024,      // 5MB
+    maxRequestSize = 10 * 1024 * 1024,  // 10MB
+    fileSizeThreshold = 1024 * 1024      // 1MB buffer
+)
 public class BlogServlet extends HttpServlet {
     private PostDAO postDAO = new PostDAO();
     private CategoryDAO categoryDAO = new CategoryDAO();
@@ -39,6 +55,8 @@ public class BlogServlet extends HttpServlet {
                 handleLoginPage(req, resp);
             } else if (path.equals("/blog/register")) {
                 handleRegisterPage(req, resp);
+            } else if (path.equals("/blog/profile")) {
+                handleProfilePage(req, resp);
             } else if (path.startsWith("/api/auth")) {
                 handleAuthAPI(req, resp);
             } else if (path.startsWith("/api/posts")) {
@@ -104,6 +122,20 @@ public class BlogServlet extends HttpServlet {
     }
 
     // ============================================
+    // 访客档案 (个人资料页)
+    // ============================================
+    private void handleProfilePage(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        User user = getCurrentUser(req);
+        if (user == null) {
+            resp.sendRedirect(req.getContextPath() + "/blog/login");
+            return;
+        }
+        req.setAttribute("currentUser", user);
+        req.getRequestDispatcher("/profile.jsp").forward(req, resp);
+    }
+
+    // ============================================
     // 认证 API
     // ============================================
     private void handleAuthAPI(HttpServletRequest req, HttpServletResponse resp)
@@ -116,6 +148,29 @@ public class BlogServlet extends HttpServlet {
         if (path.equals("/api/auth/login") && method.equals("POST")) {
             String username = req.getParameter("username");
             String password = req.getParameter("password");
+            String captcha = req.getParameter("captcha");
+
+            // 登录限流检查
+            String ip = getClientIP(req);
+            if (SecurityUtil.isBlocked(ip)) {
+                long sec = SecurityUtil.getBlockSeconds(ip);
+                resp.getWriter().write("{\"success\":false,\"error\":\"尝试次数过多，请 " + (sec / 60 + 1) + " 分钟后再试。\"}");
+                return;
+            }
+
+            // 验证码检查
+            HttpSession session = req.getSession(false);
+            if (session == null || session.getAttribute("captchaAnswer") == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码已过期，请刷新。\"}");
+                return;
+            }
+            String expectedCaptcha = (String) session.getAttribute("captchaAnswer");
+            if (captcha == null || !captcha.trim().equals(expectedCaptcha)) {
+                session.removeAttribute("captchaAnswer"); // 验证码一次性
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码错误，请重新输入。\"}");
+                return;
+            }
+            session.removeAttribute("captchaAnswer"); // 验证码一次性
 
             if (username == null || password == null || username.trim().isEmpty()) {
                 resp.getWriter().write("{\"success\":false,\"error\":\"请出示你的名札（用户名不能为空）！\"}");
@@ -124,16 +179,17 @@ public class BlogServlet extends HttpServlet {
 
             User user = userDAO.login(username.trim(), password);
             if (user != null) {
-                HttpSession session = req.getSession(true);
-                session.setAttribute("user", user);
-                session.setMaxInactiveInterval(60 * 60 * 24); // 24小时
-                resp.getWriter().write(
-                    "{\"success\":true,\"message\":\"欢迎回来，" + user.getNickname() + "！\","
-                    + "\"data\":{\"id\":" + user.getId()
-                    + ",\"username\":\"" + escapeJson(user.getUsername()) + "\""
-                    + ",\"nickname\":\"" + escapeJson(user.getNickname()) + "\""
-                    + ",\"role\":\"" + escapeJson(user.getRole()) + "\"}}");
+                SecurityUtil.clearAttempts(ip);
+                // Session 加固：登录成功后重新生成 Session ID
+                HttpSession oldSession = req.getSession(false);
+                if (oldSession != null) oldSession.invalidate();
+                HttpSession newSession = req.getSession(true);
+                newSession.setAttribute("user", user);
+                newSession.setMaxInactiveInterval(60 * 60 * 24); // 24小时
+                resp.getWriter().write(toUserJson(user));
             } else {
+                SecurityUtil.recordFailure(ip);
+                long remaining = 5 - (SecurityUtil.isBlocked(ip) ? 0 : 5);
                 resp.getWriter().write("{\"success\":false,\"error\":\"封印密语不符…请确认名札和密语是否正确。\"}");
             }
         }
@@ -142,6 +198,21 @@ public class BlogServlet extends HttpServlet {
             String username = req.getParameter("username");
             String password = req.getParameter("password");
             String nickname = req.getParameter("nickname");
+            String captcha = req.getParameter("captcha");
+
+            // 验证码
+            HttpSession session = req.getSession(false);
+            if (session == null || session.getAttribute("captchaAnswer") == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码已过期，请刷新。\"}");
+                return;
+            }
+            String expected = (String) session.getAttribute("captchaAnswer");
+            if (captcha == null || !captcha.trim().equals(expected)) {
+                session.removeAttribute("captchaAnswer");
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码错误，请重新输入。\"}");
+                return;
+            }
+            session.removeAttribute("captchaAnswer");
 
             if (username == null || username.trim().length() < 2) {
                 resp.getWriter().write("{\"success\":false,\"error\":\"名札至少需要2个字符！\"}");
@@ -169,17 +240,88 @@ public class BlogServlet extends HttpServlet {
                 resp.getWriter().write("{\"success\":false,\"error\":\"登记失败，请稍后再试。\"}");
             }
         }
+        // GET /api/auth/captcha — 获取验证码
+        else if (path.equals("/api/auth/captcha") && method.equals("GET")) {
+            resp.setContentType("application/json;charset=UTF-8");
+            HttpSession session = req.getSession(true);
+            int a = new SecureRandom().nextInt(10) + 1;
+            int b = new SecureRandom().nextInt(10) + 1;
+            String question = a + " + " + b + " = ?";
+            session.setAttribute("captchaAnswer", String.valueOf(a + b));
+            resp.getWriter().write("{\"success\":true,\"question\":\"" + question + "\"}");
+        }
         // GET /api/auth/me — 查看当前访客
         else if (path.equals("/api/auth/me") && method.equals("GET")) {
             User user = getCurrentUser(req);
             if (user != null) {
-                resp.getWriter().write(
-                    "{\"success\":true,\"data\":{\"id\":" + user.getId()
-                    + ",\"username\":\"" + escapeJson(user.getUsername()) + "\""
-                    + ",\"nickname\":\"" + escapeJson(user.getNickname()) + "\""
-                    + ",\"role\":\"" + escapeJson(user.getRole()) + "\"}}");
+                resp.getWriter().write(toUserJson(user));
             } else {
                 resp.getWriter().write("{\"success\":false,\"error\":\"未入馆\"}");
+            }
+        }
+        // POST /api/auth/profile — 更新资料 (含头像上传)
+        else if (path.equals("/api/auth/profile") && method.equals("POST")) {
+            User user = getCurrentUser(req);
+            if (user == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+                return;
+            }
+
+            String nickname = req.getParameter("nickname");
+            String avatar = null;
+
+            // 处理头像文件上传
+            Part filePart = null;
+            try { filePart = req.getPart("avatar"); } catch (Exception e) {}
+
+            if (filePart != null && filePart.getSize() > 0) {
+                String fileName = getSubmittedFileName(filePart);
+                String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf(".")) : ".jpg";
+                // 只允许图片格式
+                if (!ext.matches("\\.(jpg|jpeg|png|gif|webp)$")) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"头像仅支持 JPG/PNG/GIF/WebP 格式。\"}");
+                    return;
+                }
+                String savedName = user.getUsername() + "_" + System.currentTimeMillis() + ext;
+                String uploadDir = req.getServletContext().getRealPath("/uploads/avatars");
+                Path uploadPath = Paths.get(uploadDir);
+                if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+                Path filePath = uploadPath.resolve(savedName);
+                try (InputStream is = filePart.getInputStream()) {
+                    Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
+                }
+                avatar = "uploads/avatars/" + savedName;
+            }
+
+            boolean ok = userDAO.updateProfile(user.getId(), nickname, avatar);
+            if (ok) {
+                // 刷新 session 中的用户信息
+                if (avatar != null) user.setAvatar(avatar);
+                if (nickname != null) user.setNickname(nickname);
+                req.getSession().setAttribute("user", user);
+                resp.getWriter().write(toUserJson(user));
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"更新失败，请稍后再试。\"}");
+            }
+        }
+        // POST /api/auth/password — 修改密码
+        else if (path.equals("/api/auth/password") && method.equals("POST")) {
+            User user = getCurrentUser(req);
+            if (user == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+                return;
+            }
+            String oldPwd = req.getParameter("old_password");
+            String newPwd = req.getParameter("new_password");
+            if (oldPwd == null || newPwd == null || newPwd.length() < 4) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"新密码至少需要4个字符。\"}");
+                return;
+            }
+            boolean ok = userDAO.changePassword(user.getId(), oldPwd, newPwd);
+            if (ok) {
+                resp.getWriter().write("{\"success\":true,\"message\":\"封印密语已更新！\"}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"旧封印密语不正确。\"}");
             }
         }
         // GET /api/auth/logout — 离馆
@@ -405,6 +547,19 @@ public class BlogServlet extends HttpServlet {
     // ============================================
     // 认证辅助方法
     // ============================================
+    private String getClientIP(HttpServletRequest req) {
+        String ip = req.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = req.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = req.getRemoteAddr();
+        }
+        // 取第一个非代理 IP
+        int comma = ip.indexOf(',');
+        return comma > 0 ? ip.substring(0, comma).trim() : ip.trim();
+    }
+
     private User getCurrentUser(HttpServletRequest req) {
         HttpSession session = req.getSession(false);
         if (session == null) return null;
@@ -475,5 +630,35 @@ public class BlogServlet extends HttpServlet {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"")
                 .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+    }
+
+    private String toUserJson(User user) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"success\":true,\"message\":\"欢迎回来，").append(escapeJson(user.getNickname())).append("！\",");
+        sb.append("\"data\":{");
+        sb.append("\"id\":").append(user.getId());
+        sb.append(",\"username\":\"").append(escapeJson(user.getUsername())).append("\"");
+        sb.append(",\"nickname\":\"").append(escapeJson(user.getNickname())).append("\"");
+        sb.append(",\"role\":\"").append(escapeJson(user.getRole())).append("\"");
+        if (user.getAvatar() != null) {
+            sb.append(",\"avatar\":\"").append(escapeJson(user.getAvatar())).append("\"");
+        }
+        sb.append("}}");
+        return sb.toString();
+    }
+
+    /** 从 multipart Part 中提取文件名 */
+    private String getSubmittedFileName(Part part) {
+        String header = part.getHeader("content-disposition");
+        if (header == null) return "avatar.jpg";
+        Matcher m = Pattern.compile("filename\\s*=\\s*\"([^\"]*)\"").matcher(header);
+        if (m.find()) {
+            String name = m.group(1);
+            // 处理 IE 全路径
+            int idx = name.lastIndexOf('\\');
+            if (idx >= 0) name = name.substring(idx + 1);
+            return name.isEmpty() ? "avatar.jpg" : name;
+        }
+        return "avatar.jpg";
     }
 }

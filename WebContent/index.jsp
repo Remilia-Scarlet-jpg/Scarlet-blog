@@ -38,9 +38,12 @@
                 <a href="<%=ctxPath%>/blog" class="active" title="大厅">🏠 大厅</a>
                 <a href="<%=ctxPath%>/blog/admin" title="管理室">⚙️ 管理室</a>
                 <% if (currentUser != null) { %>
-                    <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light)">
-                        🚪 离馆 (<%= currentUser.getNickname() %>)
+                    <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
+                        <img src="<%= currentUser.getAvatar() != null ? ctxPath + "/" + currentUser.getAvatar() : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
+                             style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
+                        <%= currentUser.getNickname() %>
                     </a>
+                    <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light)">🚪 离馆</a>
                 <% } else { %>
                     <a href="<%=ctxPath%>/blog/login" title="入馆通行">⚜️ 入馆</a>
                 <% } %>
@@ -53,6 +56,28 @@
             <div class="hero-section">
                 <h2>✦ 红魔馆博客 ✦</h2>
                 <p>欢迎来到幻想乡一隅的红魔馆</p>
+            </div>
+
+            <%-- 轮播图 --%>
+            <div class="carousel-container">
+                <div class="carousel-track" id="carouselTrack">
+                    <div class="carousel-slide">
+                        <img src="<%=ctxPath%>/images/slide_1.jpg" alt="红魔馆">
+                    </div>
+                    <div class="carousel-slide">
+                        <img src="<%=ctxPath%>/images/slide_2.jpg" alt="红魔馆">
+                    </div>
+                    <div class="carousel-slide">
+                        <img src="<%=ctxPath%>/images/slide_3.jpg" alt="红魔馆">
+                    </div>
+                </div>
+                <button class="carousel-arrow carousel-prev" onclick="changeSlide(-1)" title="上一张">◀</button>
+                <button class="carousel-arrow carousel-next" onclick="changeSlide(1)" title="下一张">▶</button>
+                <div class="carousel-dots" id="carouselDots">
+                    <span class="carousel-dot active" onclick="goToSlide(0)"></span>
+                    <span class="carousel-dot" onclick="goToSlide(1)"></span>
+                    <span class="carousel-dot" onclick="goToSlide(2)"></span>
+                </div>
             </div>
 
             <div id="posts-container">
@@ -180,5 +205,59 @@
         <p>© 2024 红魔馆 | Powered by Java Servlet &amp; MySQL</p>
         <p>当前路径: <%= request.getRequestURI() %></p>
     </footer>
+
+    <script>
+        // ============================================
+        // 🎠 红魔馆轮播
+        // ============================================
+        var currentSlide = 0;
+        var totalSlides = 3;
+        var slideInterval;
+
+        function showSlide(index) {
+            var track = document.getElementById('carouselTrack');
+            var dots = document.querySelectorAll('.carousel-dot');
+            if (index >= totalSlides) index = 0;
+            if (index < 0) index = totalSlides - 1;
+            currentSlide = index;
+            track.style.transform = 'translateX(-' + (currentSlide * 100) + '%)';
+            dots.forEach(function(d, i) {
+                d.classList.toggle('active', i === currentSlide);
+            });
+        }
+
+        function changeSlide(dir) {
+            showSlide(currentSlide + dir);
+            resetTimer();
+        }
+
+        function goToSlide(index) {
+            showSlide(index);
+            resetTimer();
+        }
+
+        function resetTimer() {
+            clearInterval(slideInterval);
+            slideInterval = setInterval(function() { changeSlide(1); }, 5000);
+        }
+
+        // 启动轮播
+        slideInterval = setInterval(function() { changeSlide(1); }, 5000);
+
+        // 触摸滑动支持
+        (function() {
+            var container = document.querySelector('.carousel-container');
+            var startX = 0;
+            container.addEventListener('touchstart', function(e) {
+                startX = e.touches[0].clientX;
+            });
+            container.addEventListener('touchend', function(e) {
+                var diff = startX - e.changedTouches[0].clientX;
+                if (Math.abs(diff) > 50) {
+                    changeSlide(diff > 0 ? 1 : -1);
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

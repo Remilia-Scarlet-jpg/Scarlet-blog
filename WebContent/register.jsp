@@ -174,6 +174,14 @@
                     <label>🔐 封印密语（密码）*</label>
                     <input type="password" name="password" id="password" placeholder="设置你的封印密语，至少4个字符" maxlength="100" required>
                 </div>
+                <div class="form-group">
+                    <label>🧩 验证码</label>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span id="captchaQuestion" style="background:var(--bg-dark);padding:12px 18px;border:1px solid var(--border-dark);border-radius:4px;color:var(--gold);font-family:var(--font-title);font-size:1.1rem;letter-spacing:1px;min-width:120px;text-align:center;">加载中...</span>
+                        <button type="button" onclick="refreshCaptcha()" style="background:none;border:1px solid var(--border-dark);color:var(--text-muted);cursor:pointer;padding:8px 12px;border-radius:4px;font-size:0.8rem;transition:all 0.3s;">🔄 刷新</button>
+                    </div>
+                    <input type="text" id="captcha" placeholder="请输入答案" maxlength="5" required style="margin-top:8px;width:100%;background:var(--bg-dark);border:1px solid var(--border-dark);color:var(--text-light);padding:10px 15px;font-family:var(--font-jp);font-size:0.9rem;border-radius:4px;">
+                </div>
                 <button type="submit" class="btn-scarlet">📝 登记入馆</button>
             </form>
 
@@ -192,11 +200,22 @@
     </footer>
 
     <script>
+        function refreshCaptcha() {
+            fetch('<%=ctxPath%>/api/auth/captcha')
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) document.getElementById('captchaQuestion').textContent = d.question;
+                });
+            document.getElementById('captcha').value = '';
+        }
+        refreshCaptcha();
+
         async function doRegister(e) {
             e.preventDefault();
             var username = document.getElementById('username').value.trim();
             var nickname = document.getElementById('nickname').value.trim();
             var password = document.getElementById('password').value;
+            var captcha = document.getElementById('captcha').value.trim();
             var errorBox = document.getElementById('errorMsg');
             var successBox = document.getElementById('successMsg');
             errorBox.classList.remove('show');
@@ -210,11 +229,16 @@
                 showError('封印密语至少需要4个字符，请增强你的封印。');
                 return;
             }
+            if (!captcha) {
+                showError('请输入验证码。');
+                return;
+            }
 
             try {
                 var formData = 'username=' + encodeURIComponent(username)
                     + '&password=' + encodeURIComponent(password)
-                    + '&nickname=' + encodeURIComponent(nickname || username);
+                    + '&nickname=' + encodeURIComponent(nickname || username)
+                    + '&captcha=' + encodeURIComponent(captcha);
                 var resp = await fetch('<%=ctxPath%>/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -231,6 +255,7 @@
                         window.location.href = '<%=ctxPath%>/blog/login';
                     }, 2500);
                 } else {
+                    refreshCaptcha();
                     showError(data.error || '来馆登记失败。');
                 }
             } catch (err) {
