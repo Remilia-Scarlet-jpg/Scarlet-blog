@@ -20,10 +20,7 @@ public class DBUtil {
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
         + "&sslMode=REQUIRED"
-        + "&connectTimeout=20000"
-        + "&socketTimeout=20000"
-        + "&connectTimeout=20000"
-        + "&socketTimeout=20000";
+        + "&connectTimeout=30000";
 
     /** CA 证书路径（Docker 容器内） */
     private static String getCaPath() {
@@ -65,8 +62,11 @@ public class DBUtil {
 
     /** 首次启动时自动建表和种子数据 */
     private static void initDatabase() {
+        System.out.println("[DB] Connecting to " + DB_HOST + ":" + DB_PORT + " user=" + DB_USER + " pass_set=" + (!PASS.isEmpty()));
+        System.out.println("[DB] URL: " + URL.substring(0, URL.indexOf("?")));
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
              Statement stmt = conn.createStatement()) {
+            System.out.println("[DB] Connected successfully!");
 
             // 检查是否已有表
             ResultSet rs = stmt.executeQuery("SHOW TABLES LIKE 'posts'");
@@ -151,6 +151,7 @@ public class DBUtil {
                 "('sakuya', '" + SecurityUtil.hashPassword("maid123") + "', '十六夜 咲夜', NULL, '女仆长')");
 
         } catch (SQLException e) {
+            System.err.println("[DB] ERROR connecting to MySQL: " + e.getMessage());
             e.printStackTrace();
         }
     }
