@@ -19,9 +19,16 @@ public class DBUtil {
         "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
-        + "&sslMode=DISABLED"
+        + "&sslMode=VERIFY_CA"
+        + "&sslCa=" + getCaPath()
         + "&connectTimeout=20000"
         + "&socketTimeout=20000";
+
+    /** CA 证书路径（Docker 容器内） */
+    private static String getCaPath() {
+        String path = System.getenv("CA_CERT_PATH");
+        return (path != null) ? path : "/usr/local/tomcat/ca.pem";
+    }
     private static final String USER = DB_USER;
     private static final String PASS = DB_PASS;
 

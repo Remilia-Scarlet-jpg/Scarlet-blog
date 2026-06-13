@@ -13,7 +13,8 @@ COPY WebContent/ /usr/local/tomcat/webapps/ROOT/
 # 编译好的 Java 类
 COPY bin/com/scarletblog/ /usr/local/tomcat/webapps/ROOT/WEB-INF/classes/com/scarletblog/
 
-# MySQL 数据库驱动
+# Aiven CA 证书 + MySQL 驱动
+COPY ca.pem /usr/local/tomcat/
 COPY mysql-connector-*.jar /usr/local/tomcat/webapps/ROOT/WEB-INF/lib/
 
 # 暴露 Tomcat 端口（Render 会自动设置 PORT=8080）
