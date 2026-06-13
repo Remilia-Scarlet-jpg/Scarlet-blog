@@ -67,6 +67,8 @@ public class BlogServlet extends HttpServlet {
                 handleCategoriesAPI(req, resp);
             } else if (path.equals("/api/stats")) {
                 handleStatsAPI(req, resp);
+            } else if (path.equals("/api/health")) {
+                handleHealth(req, resp);
             } else {
                 req.getRequestDispatcher("/index.jsp").forward(req, resp);
             }
@@ -528,6 +530,24 @@ public class BlogServlet extends HttpServlet {
               .append(",\"post_count\":").append(c.getPostCount()).append("}");
         }
         sb.append("]}");
+        resp.getWriter().write(sb.toString());
+    }
+
+    /** 健康检查 - 诊断用 */
+    private void handleHealth(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        resp.setContentType("application/json;charset=UTF-8");
+        StringBuilder sb = new StringBuilder("{\"status\":\"ok\",");
+        sb.append("\"db_host\":\"").append(escapeJson(System.getenv("DB_HOST") != null ? System.getenv("DB_HOST") : "default")).append("\",");
+        sb.append("\"db_pass_set\":").append(System.getenv("DB_PASS") != null && !System.getenv("DB_PASS").isEmpty());
+        try {
+            java.sql.Connection c = com.scarletblog.util.DBUtil.getConnection();
+            sb.append(",\"db\":\"connected\"");
+            c.close();
+        } catch (Exception e) {
+            sb.append(",\"db\":\"error\",\"db_error\":\"").append(escapeJson(e.getMessage())).append("\"");
+        }
+        sb.append("}");
         resp.getWriter().write(sb.toString());
     }
 
