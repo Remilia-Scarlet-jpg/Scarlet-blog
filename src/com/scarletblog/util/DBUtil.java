@@ -20,8 +20,9 @@ public class DBUtil {
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
         + "&sslMode=REQUIRED"
-        + "&connectTimeout=15000"
-        + "&socketTimeout=15000";
+        + "&tlsVersions=TLSv1.2,TLSv1.3"
+        + "&connectTimeout=20000"
+        + "&socketTimeout=20000";
     private static final String USER = DB_USER;
     private static final String PASS = DB_PASS;
 
