@@ -19,7 +19,9 @@ public class DBUtil {
         "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
-        + "&useSSL=true&requireSSL=true";
+        + "&sslMode=REQUIRED"
+        + "&connectTimeout=15000"
+        + "&socketTimeout=15000";
     private static final String USER = DB_USER;
     private static final String PASS = DB_PASS;
 
