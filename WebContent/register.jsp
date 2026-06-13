@@ -187,9 +187,6 @@
 
             <div class="auth-footer">
                 <p>已有名札？ <a href="<%=ctxPath%>/blog/login">⚜️ 入馆通行 →</a></p>
-                <p style="margin-top:8px;font-size:0.75rem;color:var(--text-muted);">
-                    馆主演示：名札 <code style="color:var(--gold)">remilia</code> · 密语 <code style="color:var(--gold)">admin123</code>
-                </p>
             </div>
         </div>
     </div>
