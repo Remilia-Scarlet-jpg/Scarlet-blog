@@ -19,7 +19,7 @@ public class DBUtil {
         "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
-        + "&sslMode=REQUIRED"
+        + "&sslMode=DISABLED"
         + "&connectTimeout=20000"
         + "&socketTimeout=20000";
 
