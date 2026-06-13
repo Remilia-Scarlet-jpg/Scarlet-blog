@@ -9,8 +9,8 @@ import java.sql.*;
 public class DBUtil {
 
     // 数据库连接 — 优先从环境变量读取（Render 部署用），fallback 为 Aiven 默认值
-    private static final String DB_HOST = env("DB_HOST", "scarlet-blog-scarlet-blog.e.aivencloud.com");
-    private static final String DB_PORT = env("DB_PORT", "11413");
+    private static final String DB_HOST = env("DB_HOST", "mysql-scarlet-blog-scarlet-blog.e.aivencloud.com");
+    private static final String DB_PORT = env("DB_PORT", "11400");
     private static final String DB_NAME = env("DB_NAME", "defaultdb");
     private static final String DB_USER = env("DB_USER", "avnadmin");
     private static final String DB_PASS = env("DB_PASS", "");
@@ -19,8 +19,7 @@ public class DBUtil {
         "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
-        + "&sslMode=PREFERRED"
-        + "&tlsVersions=TLSv1.2,TLSv1.3"
+        + "&sslMode=REQUIRED"
         + "&connectTimeout=20000"
         + "&socketTimeout=20000";
 
