@@ -1,0 +1,303 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="java.util.List, com.scarletblog.model.Post, com.scarletblog.model.Category, com.scarletblog.model.User" %>
+<%
+    List<Post> posts = (List<Post>) request.getAttribute("posts");
+    List<Category> categories = (List<Category>) request.getAttribute("categories");
+    Integer totalPosts = (Integer) request.getAttribute("totalPosts");
+    Integer totalComments = (Integer) request.getAttribute("totalComments");
+    Integer totalViews = (Integer) request.getAttribute("totalViews");
+    User currentUser = (User) request.getAttribute("currentUser");
+    String ctxPath = request.getContextPath();
+    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm");
+%>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理室 - 红魔馆博客</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E⚙️%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="<%=ctxPath%>/css/scarlet.css">
+</head>
+<body>
+    <header class="scarlet-header">
+        <div class="header-inner">
+            <div class="logo-area">
+                <div class="logo-icon">⚙️</div>
+                <div class="logo-text">
+                    <h1>管 理 室</h1>
+                    <span class="subtitle">~ 咲夜的执务室 ~</span>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="<%=ctxPath%>/blog">🏠 大厅</a>
+                <a href="<%=ctxPath%>/blog/admin" class="active">⚙️ 管理室</a>
+                <% if (currentUser != null) { %>
+                    <span style="padding:10px 15px;color:var(--gold);font-size:0.85rem;">
+                        🎭 <%= currentUser.getNickname() %>
+                        <span style="color:var(--text-muted);font-size:0.7rem;">(<%= currentUser.getRole() %>)</span>
+                    </span>
+                    <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light);border:1px solid var(--scarlet);">🚪 离馆</a>
+                <% } else { %>
+                    <a href="<%=ctxPath%>/blog/login">⚜️ 入馆</a>
+                <% } %>
+            </nav>
+        </div>
+    </header>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="main-container full-width">
+        <div class="content-area">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📝</div>
+                    <div class="stat-value"><%= totalPosts != null ? totalPosts : 0 %></div>
+                    <div class="stat-label">文章数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💬</div>
+                    <div class="stat-value"><%= totalComments != null ? totalComments : 0 %></div>
+                    <div class="stat-label">评论数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👁️</div>
+                    <div class="stat-value"><%= totalViews != null ? totalViews : 0 %></div>
+                    <div class="stat-label">总浏览量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📂</div>
+                    <div class="stat-value"><%= categories != null ? categories.size() : 0 %></div>
+                    <div class="stat-label">分类数</div>
+                </div>
+            </div>
+
+            <div class="admin-header">
+                <h2>📋 文章列表</h2>
+                <button class="btn-scarlet" onclick="openCreateModal()">✨ 新建文章</button>
+            </div>
+
+            <div style="overflow-x:auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>标题</th>
+                            <th>作者</th>
+                            <th>分类</th>
+                            <th>浏览</th>
+                            <th>状态</th>
+                            <th>更新日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (posts != null && !posts.isEmpty()) {
+                            for (Post p : posts) {
+                                String catName = p.getCategoryName() != null ? p.getCategoryName() : "-";
+                                String catIcon = p.getCategoryIcon() != null ? p.getCategoryIcon() : "";
+                        %>
+                        <tr>
+                            <td><%= p.getId() %></td>
+                            <td><strong><%= p.getTitle() %></strong></td>
+                            <td><%= p.getAuthor() != null ? p.getAuthor() : "-" %></td>
+                            <td><%= catIcon %> <%= catName %></td>
+                            <td><%= p.getViewCount() %></td>
+                            <td><%= p.getIsPublished() == 1 ? "✅ 公开" : "📝 草稿" %></td>
+                            <td><%= p.getUpdatedAt() != null ? sdf.format(p.getUpdatedAt()) : "-" %></td>
+                            <td>
+                                <div class="actions" style="display:flex;gap:6px;">
+                                    <button class="btn-scarlet-outline" onclick="editPost(<%=p.getId()%>, '<%= p.getTitle().replace("'", "\\'") %>', '<%= p.getContent() != null ? p.getContent().replace("'", "\\'").replace("\n", "\\n") : "" %>', '<%= p.getAuthor() != null ? p.getAuthor() : "红魔馆之主" %>', <%= p.getCategoryId() %>, '<%= p.getTags() != null ? p.getTags() : "" %>', <%= p.getIsPublished() %>)" style="padding:5px 10px;font-size:0.8rem;">✏️</button>
+                                    <button class="btn-scarlet-outline btn-danger" onclick="deletePost(<%=p.getId()%>)" style="padding:5px 10px;font-size:0.8rem;">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <%     }
+                           } else { %>
+                        <tr><td colspan="8"><div class="loading-spinner">暂无文章</div></td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文章编辑弹窗 -->
+    <div class="modal-overlay" id="postModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="modalTitle">📝 新建文章</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="postForm" onsubmit="savePost(event)">
+                    <input type="hidden" id="editPostId">
+                    <div class="form-group">
+                        <label>📌 标题 *</label>
+                        <input type="text" id="editTitle" placeholder="输入文章标题" maxlength="200" required>
+                    </div>
+                    <div class="form-group">
+                        <label>✍️ 作者</label>
+                        <input type="text" id="editAuthor" placeholder="作者名" maxlength="50" value="红魔馆之主">
+                    </div>
+                    <div class="form-group">
+                        <label>📂 分类</label>
+                        <select id="editCategory">
+                            <option value="">无分类</option>
+                            <% if (categories != null) {
+                                for (Category c : categories) { %>
+                            <option value="<%=c.getId()%>"><%= c.getIcon() != null ? c.getIcon() : "" %> <%= c.getName() %></option>
+                            <%     }
+                               } %>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>🏷️ 标签（逗号分隔）</label>
+                        <input type="text" id="editTags" placeholder="例: 东方,红魔馆,Java" maxlength="200">
+                    </div>
+                    <div class="form-group">
+                        <label>📝 内容 *（支持HTML）</label>
+                        <textarea id="editContent" placeholder="在这里写下文章内容..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>🖼️ 封面图片URL</label>
+                        <input type="text" id="editCoverImage" placeholder="https://example.com/image.jpg" maxlength="500">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="editPublished" checked>
+                            公开发布
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-scarlet-outline" onclick="closeModal()">取消</button>
+                        <button type="submit" class="btn-scarlet">💾 保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <footer class="scarlet-footer">
+        <div class="footer-ornament">◆ ◇ ◆</div>
+        <p>🏰 红魔馆博客 — 管理室</p>
+        <p>© 2024 红魔馆 | Powered by Java Servlet &amp; MySQL</p>
+    </footer>
+
+    <script>
+        var API_BASE = '<%=ctxPath%>/api';
+        var ctxPath = '<%=ctxPath%>';
+
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = '📝 新建文章';
+            document.getElementById('editPostId').value = '';
+            document.getElementById('editTitle').value = '';
+            document.getElementById('editAuthor').value = '红魔馆之主';
+            document.getElementById('editCategory').value = '';
+            document.getElementById('editTags').value = '';
+            document.getElementById('editContent').value = '';
+            document.getElementById('editCoverImage').value = '';
+            document.getElementById('editPublished').checked = true;
+            document.getElementById('postModal').classList.add('active');
+        }
+
+        function editPost(id, title, content, author, categoryId, tags, isPublished) {
+            document.getElementById('modalTitle').textContent = '✏️ 编辑文章 #' + id;
+            document.getElementById('editPostId').value = id;
+            document.getElementById('editTitle').value = title;
+            document.getElementById('editAuthor').value = author || '红魔馆之主';
+            document.getElementById('editCategory').value = categoryId || '';
+            document.getElementById('editTags').value = tags || '';
+            document.getElementById('editContent').value = content || '';
+            document.getElementById('editCoverImage').value = '';
+            document.getElementById('editPublished').checked = isPublished == 1;
+            document.getElementById('postModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('postModal').classList.remove('active');
+        }
+
+        function savePost(e) {
+            e.preventDefault();
+            var id = document.getElementById('editPostId').value;
+            var data = {
+                title: document.getElementById('editTitle').value,
+                author: document.getElementById('editAuthor').value,
+                category_id: parseInt(document.getElementById('editCategory').value) || null,
+                tags: document.getElementById('editTags').value,
+                content: document.getElementById('editContent').value,
+                cover_image: document.getElementById('editCoverImage').value || null,
+                is_published: document.getElementById('editPublished').checked ? 1 : 0
+            };
+
+            var method = id ? 'PUT' : 'POST';
+            var url = id ? API_BASE + '/posts/' + id : API_BASE + '/posts';
+
+            var xhr = new XMLHttpRequest();
+            xhr.open(method, url, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function() {
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.success) {
+                        showToast(resp.message || '保存成功！', 'success');
+                        closeModal();
+                        setTimeout(function() { location.reload(); }, 800);
+                    } else {
+                        showToast(resp.error || '保存失败', 'error');
+                    }
+                } catch(e) {
+                    showToast('操作失败', 'error');
+                }
+            };
+            var params = [];
+            for (var k in data) {
+                if (data[k] !== null && data[k] !== undefined) {
+                    params.push(encodeURIComponent(k) + '=' + encodeURIComponent(data[k]));
+                }
+            }
+            xhr.send(params.join('&'));
+        }
+
+        function deletePost(id) {
+            if (!confirm('确定要删除文章 #' + id + ' 吗？此操作不可恢复！')) return;
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('DELETE', API_BASE + '/posts/' + id, true);
+            xhr.onload = function() {
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.success) {
+                        showToast(resp.message || '文章已删除', 'success');
+                        setTimeout(function() { location.reload(); }, 800);
+                    } else {
+                        showToast(resp.error || '删除失败', 'error');
+                    }
+                } catch(e) {
+                    showToast('删除失败', 'error');
+                }
+            };
+            xhr.send();
+        }
+
+        function showToast(message, type) {
+            var container = document.getElementById('toastContainer');
+            var toast = document.createElement('div');
+            toast.className = 'toast ' + (type || 'success');
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(function() {
+                toast.style.opacity = '0';
+                toast.style.transition = 'all 0.4s';
+                setTimeout(function() { toast.remove(); }, 400);
+            }, 3000);
+        }
+
+        // Close modal on overlay click
+        document.getElementById('postModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+</body>
+</html>

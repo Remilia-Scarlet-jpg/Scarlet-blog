@@ -1,0 +1,184 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="java.util.List, com.scarletblog.model.Post, com.scarletblog.model.Category, com.scarletblog.model.User" %>
+<%
+    List<Post> posts = (List<Post>) request.getAttribute("posts");
+    List<Category> categories = (List<Category>) request.getAttribute("categories");
+    Integer currentPage = (Integer) request.getAttribute("currentPage");
+    Integer totalPages = (Integer) request.getAttribute("totalPages");
+    String search = (String) request.getAttribute("search");
+    String currentCategory = (String) request.getAttribute("currentCategory");
+    Integer totalPosts = (Integer) request.getAttribute("totalPosts");
+    Integer totalComments = (Integer) request.getAttribute("totalComments");
+    Integer totalViews = (Integer) request.getAttribute("totalViews");
+    User currentUser = (User) request.getAttribute("currentUser");
+    String ctxPath = request.getContextPath();
+    if (currentPage == null) currentPage = 1;
+    if (totalPages == null) totalPages = 1;
+%>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 红魔馆博客 - Scarlet Devil Mansion Blog</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E🏰%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="<%=ctxPath%>/css/scarlet.css">
+</head>
+<body>
+    <header class="scarlet-header">
+        <div class="header-inner">
+            <div class="logo-area">
+                <div class="logo-icon">🏰</div>
+                <div class="logo-text">
+                    <h1>红 魔 馆</h1>
+                    <span class="subtitle">Scarlet Devil Mansion</span>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="<%=ctxPath%>/blog" class="active" title="大厅">🏠 大厅</a>
+                <a href="<%=ctxPath%>/blog/admin" title="管理室">⚙️ 管理室</a>
+                <% if (currentUser != null) { %>
+                    <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light)">
+                        🚪 离馆 (<%= currentUser.getNickname() %>)
+                    </a>
+                <% } else { %>
+                    <a href="<%=ctxPath%>/blog/login" title="入馆通行">⚜️ 入馆</a>
+                <% } %>
+            </nav>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="content-area">
+            <div class="hero-section">
+                <h2>✦ 红魔馆博客 ✦</h2>
+                <p>欢迎来到幻想乡一隅的红魔馆</p>
+            </div>
+
+            <div id="posts-container">
+                <% if (posts != null && !posts.isEmpty()) {
+                    for (Post p : posts) {
+                        String excerpt = p.getExcerpt();
+                        if (excerpt == null || excerpt.isEmpty()) {
+                            String content = p.getContent();
+                            excerpt = content != null ? content.replaceAll("<[^>]*>", "") : "";
+                            if (excerpt.length() > 200) excerpt = excerpt.substring(0, 200) + "...";
+                        }
+                %>
+                <article class="post-card">
+                    <div class="post-card-body">
+                        <div class="post-card-meta">
+                            <span class="post-card-category"><%= p.getCategoryIcon() != null ? p.getCategoryIcon() : "📜" %> <%= p.getCategoryName() != null ? p.getCategoryName() : "未分类" %></span>
+                            <span>🕐 <%= p.getCreatedAt() != null ? new java.text.SimpleDateFormat("yyyy年MM月dd日").format(p.getCreatedAt()) : "" %></span>
+                            <span>✍️ <%= p.getAuthor() != null ? p.getAuthor() : "红魔馆之主" %></span>
+                        </div>
+                        <h2 class="post-card-title">
+                            <a href="<%=ctxPath%>/blog/post?id=<%=p.getId()%>"><%= p.getTitle() %></a>
+                        </h2>
+                        <p class="post-card-excerpt"><%= excerpt %></p>
+                        <div class="post-card-footer">
+                            <div class="post-card-stats">
+                                <span>👁️ <%= p.getViewCount() %></span>
+                            </div>
+                            <div class="post-card-tags">
+                                <% if (p.getTags() != null && !p.getTags().isEmpty()) {
+                                    for (String tag : p.getTags().split(",")) { %>
+                                        <a href="?search=<%= tag.trim() %>" class="post-card-tag">🏷️ <%= tag.trim() %></a>
+                                <%  }
+                                   } %>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+                <%     }
+                   } else { %>
+                <div class="empty-state">
+                    <div class="empty-icon">📜</div>
+                    <p>该分类下暂无文章</p>
+                </div>
+                <% } %>
+            </div>
+
+            <%-- 分页 --%>
+            <div class="pagination">
+                <% if (totalPages > 1) {
+                    String queryStr = (search != null ? "&search=" + java.net.URLEncoder.encode(search, "UTF-8") : "")
+                        + (currentCategory != null ? "&category=" + java.net.URLEncoder.encode(currentCategory, "UTF-8") : "");
+                    if (currentPage > 1) { %>
+                        <a href="<%=ctxPath%>/blog?page=<%=currentPage-1%><%=queryStr%>"><button>◀ 上一页</button></a>
+                <%  }
+                    for (int i = 1; i <= totalPages; i++) {
+                        if (i == currentPage) { %>
+                        <button class="active"><%=i%></button>
+                <%      } else { %>
+                        <a href="<%=ctxPath%>/blog?page=<%=i%><%=queryStr%>"><button><%=i%></button></a>
+                <%      }
+                    }
+                    if (currentPage < totalPages) { %>
+                        <a href="<%=ctxPath%>/blog?page=<%=currentPage+1%><%=queryStr%>"><button>下一页 ▶</button></a>
+                <%  }
+                   } %>
+            </div>
+        </div>
+
+        <aside class="sidebar">
+            <div class="scarlet-card">
+                <div class="scarlet-card-header">🔍 搜索</div>
+                <div class="scarlet-card-body">
+                    <form class="search-box" action="<%=ctxPath%>/blog" method="get">
+                        <input type="text" name="search" placeholder="输入关键词..." value="<%= search != null ? search : "" %>">
+                        <% if (currentCategory != null) { %><input type="hidden" name="category" value="<%=currentCategory%>"><% } %>
+                        <button type="submit">搜索</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="scarlet-card">
+                <div class="scarlet-card-header">📂 分类</div>
+                <div class="scarlet-card-body">
+                    <ul>
+                        <li><a href="<%=ctxPath%>/blog">📜 全部文章</a></li>
+                        <% if (categories != null) {
+                            for (Category c : categories) { %>
+                        <li><a href="<%=ctxPath%>/blog?category=<%= java.net.URLEncoder.encode(c.getName(), "UTF-8") %>">
+                            <%= c.getIcon() != null ? c.getIcon() : "📜" %> <%= c.getName() %>
+                            <span style="color:var(--text-muted);font-size:0.8rem;">(<%=c.getPostCount()%>)</span>
+                        </a></li>
+                        <%     }
+                           } %>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="scarlet-card">
+                <div class="scarlet-card-header">📊 红魔馆统计</div>
+                <div class="scarlet-card-body">
+                    <p>📝 文章: <strong style="color:var(--gold)"><%= totalPosts != null ? totalPosts : 0 %></strong></p>
+                    <p>💬 评论: <strong style="color:var(--gold)"><%= totalComments != null ? totalComments : 0 %></strong></p>
+                    <p>👁️ 浏览: <strong style="color:var(--gold)"><%= totalViews != null ? totalViews : 0 %></strong></p>
+                </div>
+            </div>
+
+            <div class="scarlet-card">
+                <div class="scarlet-card-header">👥 馆中住人</div>
+                <div class="scarlet-card-body">
+                    <ul>
+                        <li><span>🧛‍♀️</span> 蕾米莉亚·斯卡雷特 — 馆主</li>
+                        <li><span>🎲</span> 芙兰朵露·斯卡雷特 — 妹妹大人</li>
+                        <li><span>⏱️</span> 十六夜 咲夜 — 女仆长</li>
+                        <li><span>📖</span> 帕秋莉·诺蕾姬 — 魔法使</li>
+                        <li><span>🚪</span> 红 美铃 — 门卫</li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <footer class="scarlet-footer">
+        <div class="footer-ornament">◆ ◇ ◆</div>
+        <p>🏰 红魔馆博客 — Scarlet Devil Mansion Blog</p>
+        <p>© 2024 红魔馆 | Powered by Java Servlet &amp; MySQL</p>
+        <p>当前路径: <%= request.getRequestURI() %></p>
+    </footer>
+</body>
+</html>

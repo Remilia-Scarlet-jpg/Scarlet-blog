@@ -1,0 +1,5 @@
+.project
+.classpath
+.settings/
+auth_migration.sql
+*.zip

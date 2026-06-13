@@ -1,0 +1,249 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="com.scarletblog.model.User" %>
+<%
+    String ctxPath = request.getContextPath();
+    User currentUser = (User) request.getAttribute("currentUser");
+    if (currentUser != null) {
+        response.sendRedirect(ctxPath + "/blog/admin");
+        return;
+    }
+%>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📝 来馆登记 - 红魔馆</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E🏰%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="<%=ctxPath%>/css/scarlet.css">
+    <style>
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 70vh;
+            padding: 40px 20px;
+        }
+        .auth-card {
+            background: linear-gradient(135deg, #1a0a0a 0%, #0d0505 100%);
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: 50px 40px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 0 40px rgba(139, 0, 0, 0.3), 0 10px 30px rgba(0,0,0,0.6);
+            position: relative;
+        }
+        .auth-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--scarlet-darkest), var(--scarlet), var(--gold), var(--scarlet), var(--scarlet-darkest));
+        }
+        .auth-card h2 {
+            font-family: var(--font-title);
+            color: var(--gold);
+            text-align: center;
+            font-size: 1.6rem;
+            margin-bottom: 5px;
+            letter-spacing: 4px;
+        }
+        .auth-card .subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            font-family: var(--font-en);
+            font-style: italic;
+            font-size: 0.85rem;
+            margin-bottom: 35px;
+            display: block;
+        }
+        .auth-card .gate-icon {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 15px;
+            animation: logoPulse 3s ease-in-out infinite;
+        }
+        .auth-form .form-group {
+            margin-bottom: 22px;
+        }
+        .auth-form label {
+            display: block;
+            color: var(--gold);
+            font-family: var(--font-en);
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        .auth-form input {
+            width: 100%;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-dark);
+            color: var(--text-light);
+            padding: 14px 16px;
+            font-family: var(--font-jp);
+            font-size: 1rem;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        .auth-form input:focus {
+            outline: none;
+            border-color: var(--gold-dark);
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+        }
+        .auth-form .btn-scarlet {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            margin-top: 10px;
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 25px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .auth-footer a {
+            color: var(--scarlet-light);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        .auth-footer a:hover {
+            color: var(--gold-bright);
+        }
+        .error-msg {
+            background: rgba(220, 20, 60, 0.15);
+            border: 1px solid var(--scarlet);
+            border-radius: 4px;
+            padding: 12px 15px;
+            color: var(--scarlet-light);
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error-msg.show { display: block; }
+        .success-msg {
+            background: rgba(46, 204, 113, 0.15);
+            border: 1px solid #2ecc71;
+            border-radius: 4px;
+            padding: 12px 15px;
+            color: #2ecc71;
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .success-msg.show { display: block; }
+    </style>
+</head>
+<body>
+    <header class="scarlet-header">
+        <div class="header-inner">
+            <div class="logo-area">
+                <div class="logo-icon">🏰</div>
+                <div class="logo-text">
+                    <h1>红 魔 馆</h1>
+                    <span class="subtitle">Scarlet Devil Mansion</span>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="<%=ctxPath%>/blog">🏠 大厅</a>
+                <a href="<%=ctxPath%>/blog/login">⚜️ 入馆通行</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="gate-icon">📝</div>
+            <h2>来 馆 登 记</h2>
+            <span class="subtitle">~ 成为红魔馆的住人 ~</span>
+
+            <div class="error-msg" id="errorMsg"></div>
+            <div class="success-msg" id="successMsg"></div>
+
+            <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
+                <div class="form-group">
+                    <label>📛 名札（用户名）*</label>
+                    <input type="text" name="username" id="username" placeholder="你想要的名札，至少2个字符" maxlength="50" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label>🎭 称呼（昵称）</label>
+                    <input type="text" name="nickname" id="nickname" placeholder="在馆中的称呼，不填则与名札相同" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>🔐 封印密语（密码）*</label>
+                    <input type="password" name="password" id="password" placeholder="设置你的封印密语，至少4个字符" maxlength="100" required>
+                </div>
+                <button type="submit" class="btn-scarlet">📝 登记入馆</button>
+            </form>
+
+            <div class="auth-footer">
+                <p>已有名札？ <a href="<%=ctxPath%>/blog/login">⚜️ 入馆通行 →</a></p>
+                <p style="margin-top:8px;font-size:0.75rem;color:var(--text-muted);">
+                    馆主演示：名札 <code style="color:var(--gold)">remilia</code> · 密语 <code style="color:var(--gold)">admin123</code>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <footer class="scarlet-footer">
+        <div class="footer-ornament">◆ ◇ ◆</div>
+        <p>🏰 红魔馆博客 — Scarlet Devil Mansion Blog</p>
+    </footer>
+
+    <script>
+        async function doRegister(e) {
+            e.preventDefault();
+            var username = document.getElementById('username').value.trim();
+            var nickname = document.getElementById('nickname').value.trim();
+            var password = document.getElementById('password').value;
+            var errorBox = document.getElementById('errorMsg');
+            var successBox = document.getElementById('successMsg');
+            errorBox.classList.remove('show');
+            successBox.classList.remove('show');
+
+            if (username.length < 2) {
+                showError('名札至少需要2个字符。');
+                return;
+            }
+            if (password.length < 4) {
+                showError('封印密语至少需要4个字符，请增强你的封印。');
+                return;
+            }
+
+            try {
+                var formData = 'username=' + encodeURIComponent(username)
+                    + '&password=' + encodeURIComponent(password)
+                    + '&nickname=' + encodeURIComponent(nickname || username);
+                var resp = await fetch('<%=ctxPath%>/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                var data = await resp.json();
+                if (data.success) {
+                    // 登记成功
+                    successBox.textContent = data.message;
+                    successBox.classList.add('show');
+                    document.getElementById('registerForm').style.display = 'none';
+                    // 2秒后跳转到登录页
+                    setTimeout(function() {
+                        window.location.href = '<%=ctxPath%>/blog/login';
+                    }, 2500);
+                } else {
+                    showError(data.error || '来馆登记失败。');
+                }
+            } catch (err) {
+                showError('红魔馆大门暂时无法连接，请稍后再试。');
+            }
+        }
+
+        function showError(msg) {
+            var box = document.getElementById('errorMsg');
+            box.textContent = msg;
+            box.classList.add('show');
+            setTimeout(function() { box.classList.remove('show'); }, 5000);
+        }
+    </script>
+</body>
+</html>
