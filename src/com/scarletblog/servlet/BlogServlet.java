@@ -113,10 +113,14 @@ public class BlogServlet extends HttpServlet {
     // ============================================
     private void handleLoginPage(HttpServletRequest req, HttpServletResponse resp)
             throws Exception {
-        // 已登录则跳转管理室
+        // 已登录则按角色跳转
         User user = getCurrentUser(req);
         if (user != null) {
-            resp.sendRedirect(req.getContextPath() + "/blog/admin");
+            if (user.isAdmin()) {
+                resp.sendRedirect(req.getContextPath() + "/blog/admin");
+            } else {
+                resp.sendRedirect(req.getContextPath() + "/blog");
+            }
             return;
         }
         req.getRequestDispatcher("/login.jsp").forward(req, resp);
@@ -129,7 +133,11 @@ public class BlogServlet extends HttpServlet {
             throws Exception {
         User user = getCurrentUser(req);
         if (user != null) {
-            resp.sendRedirect(req.getContextPath() + "/blog/admin");
+            if (user.isAdmin()) {
+                resp.sendRedirect(req.getContextPath() + "/blog/admin");
+            } else {
+                resp.sendRedirect(req.getContextPath() + "/blog");
+            }
             return;
         }
         req.getRequestDispatcher("/register.jsp").forward(req, resp);
@@ -410,9 +418,38 @@ public class BlogServlet extends HttpServlet {
             return;
         }
         if (!user.isAdmin()) {
-            resp.getWriter().write("<html><body style='background:#1a0000;color:#d4af37;text-align:center;padding:100px;font-size:1.5rem;'>"
-                + "<p>🚫 只有馆主或女仆长才能进入管理室。</p>"
-                + "<p><a href='" + req.getContextPath() + "/blog' style='color:#ff6b7a;'>← 返回大厅</a></p>"
+            resp.setContentType("text/html;charset=UTF-8");
+            String ctx = req.getContextPath();
+            resp.getWriter().write("<!DOCTYPE html>"
+                + "<html lang=\"zh-CN\">"
+                + "<head>"
+                + "<meta charset=\"UTF-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">"
+                + "<title>专属房间 — 红魔馆</title>"
+                + "<style>"
+                + "*{margin:0;padding:0;box-sizing:border-box}"
+                + "body{background:linear-gradient(135deg,#1a0000,#0d0000);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'Noto Serif SC','SimSun','STSong',serif}"
+                + ".denied-card{background:linear-gradient(180deg,#1a0a0a,#0d0505);border:1px solid #4a0000;border-radius:12px;padding:60px 40px;text-align:center;max-width:500px;width:90%;box-shadow:0 0 60px rgba(139,0,0,.4),0 0 120px rgba(139,0,0,.1)}"
+                + ".denied-icon{font-size:4rem;margin-bottom:20px;animation:float 3s ease-in-out infinite}"
+                + "@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}"
+                + ".denied-title{color:#d4af37;font-size:1.6rem;letter-spacing:3px;margin-bottom:15px;font-weight:bold}"
+                + ".denied-sub{color:#a08060;font-size:1rem;margin-bottom:5px;line-height:1.8}"
+                + ".denied-countdown{color:#8b0000;font-size:0.9rem;margin-top:30px;animation:pulse 1s ease-in-out infinite}"
+                + "@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}"
+                + "</style>"
+                + "</head>"
+                + "<body>"
+                + "<div class=\"denied-card\">"
+                + "<div class=\"denied-icon\">🚪</div>"
+                + "<div class=\"denied-title\">这是蕾米莉亚和咲夜的专属房间哦</div>"
+                + "<div class=\"denied-sub\">不能进入呢~</div>"
+                + "<div class=\"denied-sub\" style=\"font-size:0.85rem;color:#6a5050;\">只有馆主和女仆长才能进入管理室</div>"
+                + "<div class=\"denied-countdown\"><span id=\"timer\">3</span> 秒后自动退回大厅...</div>"
+                + "</div>"
+                + "<script>"
+                + "var t=3;"
+                + "setInterval(function(){t--;if(t<=0){window.location.href='" + ctx + "/blog';}else{document.getElementById('timer').textContent=t;}},1000);"
+                + "</script>"
                 + "</body></html>");
             return;
         }
