@@ -1306,6 +1306,106 @@ body {
     }
 }
 
+/* ============================================
+   图片 Lightbox — 点击放大 / 触屏双击
+   ============================================ */
+.img-lightbox-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 9999;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    animation: lightboxFadeIn 0.25s ease;
+}
+.img-lightbox-overlay.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.img-lightbox-overlay.closing {
+    animation: lightboxFadeOut 0.2s ease;
+}
+@keyframes lightboxFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes lightboxFadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+.img-lightbox-overlay img {
+    max-width: 92vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border: 2px solid var(--gold);
+    box-shadow: 0 0 60px rgba(139, 0, 0, 0.5), 0 0 20px rgba(212, 175, 55, 0.3);
+    border-radius: 4px;
+    user-select: none;
+    -webkit-user-select: none;
+    /* 允许在 lightbox 内双指缩放 */
+    touch-action: pinch-zoom;
+    animation: lightboxZoomIn 0.3s ease;
+}
+@keyframes lightboxZoomIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+.img-lightbox-close {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--border-dark);
+    color: var(--text-light);
+    font-size: 1.5rem;
+    line-height: 40px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10001;
+    display: none;
+    transition: all 0.2s;
+}
+.img-lightbox-close.show {
+    display: block;
+}
+.img-lightbox-close:hover {
+    background: var(--scarlet);
+    border-color: var(--gold);
+}
+
+/* 文章内图片可点击提示 */
+.article-content img {
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+}
+.article-content img:hover {
+    opacity: 0.92;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+}
+.article-content img:active {
+    transform: scale(0.97);
+}
+
+/* 触屏优化 */
+html {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;  /* 禁用双击缩放页面，但不影响图片 pinch */
+}
+a, button, .btn-scarlet, .btn-scarlet-outline {
+    touch-action: manipulation;
+}
+/* 可滚动区域平滑滚动 */
+.admin-table,
+.crop-area-container {
+    -webkit-overflow-scrolling: touch;
+}
+
 /* ─── 横竖屏切换 ─── */
 
 /* 手机横屏：宽但矮 */

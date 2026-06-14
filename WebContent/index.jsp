@@ -207,6 +207,7 @@
         <p>当前路径: <%= request.getRequestURI() %></p>
     </footer>
 
+    <script src="<%=ctxPath%>/js/lightbox.js"></script>
     <script>
         // ============================================
         // 🎠 红魔馆轮播

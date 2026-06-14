@@ -112,6 +112,7 @@
         <p>© 2024 红魔馆 | Powered by Java Servlet &amp; MySQL</p>
     </footer>
 
+    <script src="<%=ctxPath%>/js/lightbox.js"></script>
     <script>
         function submitCommentForm(form) {
             var content = form.querySelector('textarea[name="content"]');
