@@ -77,11 +77,36 @@
         var currentUserId = <%= currentUser.getId() %>;
         var lastMsgId = 0;
         var polling = null;
+        var fetchFailCount = 0;
 
-        // 加载茶室信息
-        fetch(API_BASE + '/chat/rooms/' + roomId)
-            .then(r => r.json())
-            .then(d => {
+        // 检测移动端
+        var isMobile = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)
+                    || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+        var POLL_INTERVAL = isMobile ? 5000 : 3000;  // 移动端 5秒，桌面 3秒
+        var INITIAL_MSG_LIMIT = isMobile ? 20 : 50;   // 移动端首屏少加载
+
+        // 加载茶室信息（带重试）
+        function fetchWithRetry(url, retries, delayMs) {
+            retries = retries || 2;
+            delayMs = delayMs || 1000;
+            return fetch(url).then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            }).catch(function(e) {
+                if (retries > 0) {
+                    console.log('[chat] Retrying fetch, attempts left: ' + retries);
+                    return new Promise(function(resolve) {
+                        setTimeout(function() {
+                            resolve(fetchWithRetry(url, retries - 1, delayMs * 2));
+                        }, delayMs);
+                    });
+                }
+                throw e;
+            });
+        }
+
+        fetchWithRetry(API_BASE + '/chat/rooms/' + roomId)
+            .then(function(d) {
                 if (d.success) {
                     document.getElementById('roomName').textContent = d.data.name;
                     document.getElementById('roomIcon').textContent = d.data.type === 'public' ? '🏰' : '💬';
@@ -91,17 +116,24 @@
                     showToast(d.error, 'error');
                     setTimeout(function() { window.location.href = ctxPath + '/blog/chat'; }, 2000);
                 }
+            }).catch(function() {
+                document.getElementById('roomName').textContent = '加载失败';
+                document.getElementById('roomMeta').textContent = '请检查网络连接后刷新';
             });
 
         // 加载消息
-        loadMessages();
+        loadMessages(true);
 
-        function loadMessages() {
+        function loadMessages(isInitial) {
             var url = API_BASE + '/chat/rooms/' + roomId + '/messages';
             if (lastMsgId > 0) url += '?since=' + lastMsgId;
-            fetch(url)
-                .then(r => r.json())
-                .then(d => {
+            if (isInitial) {
+                url += (lastMsgId > 0 ? '&' : '?') + 'limit=' + INITIAL_MSG_LIMIT;
+            }
+
+            fetchWithRetry(url, 2, 1500)
+                .then(function(d) {
+                    fetchFailCount = 0;  // 重置失败计数
                     if (d.success && d.data.length > 0) {
                         d.data.forEach(function(m) {
                             appendMessage(m);
@@ -109,12 +141,18 @@
                         });
                         scrollToBottom();
                     }
+                }).catch(function() {
+                    fetchFailCount++;
+                    // 连续失败 5 次（移动端 25 秒，桌面 15 秒）提示用户
+                    if (fetchFailCount >= 5) {
+                        showToast('⚠️ 连接不稳定，消息可能延迟', 'error');
+                        fetchFailCount = 0;
+                    }
                 });
         }
 
         function appendMessage(m) {
             var container = document.getElementById('messageList');
-            // 移除空状态
             var empty = container.querySelector('.empty-state-sm');
             if (empty) empty.remove();
 
@@ -138,7 +176,6 @@
 
         function scrollToBottom() {
             var list = document.getElementById('messageList');
-            // 如果用户在顶部附近阅读历史，不自动滚动
             var nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 100;
             if (nearBottom) {
                 list.scrollTop = list.scrollHeight;
@@ -157,17 +194,19 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'room_id=' + roomId + '&content=' + encodeURIComponent(content)
             })
-            .then(r => r.json())
-            .then(d => {
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
                 btn.disabled = false; btn.textContent = '📨 发送';
                 if (d.success) {
                     input.value = '';
                     input.focus();
-                    // 立即轮询获取新消息（含自己刚发的）
                     loadMessages();
                 } else {
                     showToast(d.error, 'error');
                 }
+            }).catch(function() {
+                btn.disabled = false; btn.textContent = '📨 发送';
+                showToast('发送失败，请重试', 'error');
             });
         }
 
@@ -179,8 +218,8 @@
             }
         });
 
-        // 3 秒轮询
-        polling = setInterval(loadMessages, 3000);
+        // 自适应轮询间隔
+        polling = setInterval(loadMessages, POLL_INTERVAL);
 
         // 页面离开时停止轮询
         window.addEventListener('beforeunload', function() { clearInterval(polling); });

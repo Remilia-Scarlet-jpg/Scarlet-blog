@@ -19,7 +19,7 @@ COPY ca.pem /usr/local/tomcat/
 # Docker 内编译 Java 源码
 # servlet-api.jar 来自 Tomcat 镜像自带，mysql-connector 来自上一步
 RUN javac -encoding UTF-8 \
-    -cp /usr/local/tomcat/lib/servlet-api.jar:/usr/local/tomcat/webapps/ROOT/WEB-INF/lib/* \
+    -cp /usr/local/tomcat/lib/servlet-api.jar:/usr/local/tomcat/lib/tomcat-jdbc.jar:/usr/local/tomcat/webapps/ROOT/WEB-INF/lib/* \
     -d /usr/local/tomcat/webapps/ROOT/WEB-INF/classes \
     $(find /tmp/src -name "*.java") \
     && rm -rf /tmp/src

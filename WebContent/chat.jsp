@@ -109,6 +109,26 @@
         var currentUserId = <%= currentUser.getId() %>;
         var lastReceivedCount = 0;
         var isFirstLoad = true;
+        var connectionFailedWarned = false;
+
+        // 带重试的 fetch 包装
+        function fetchSafe(url, retries, delayMs) {
+            retries = retries || 1;
+            delayMs = delayMs || 1500;
+            return fetch(url).then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            }).catch(function(e) {
+                if (retries > 0) {
+                    return new Promise(function(resolve) {
+                        setTimeout(function() {
+                            resolve(fetchSafe(url, retries - 1, delayMs * 2));
+                        }, delayMs);
+                    });
+                }
+                throw e;
+            });
+        }
 
         // 页面加载
         loadAll();
@@ -130,15 +150,21 @@
 
         // ===== 友人 =====
         function loadFriends() {
-            fetch(API_BASE + '/friends')
-                .then(r => r.json())
-                .then(d => {
+            fetchSafe(API_BASE + '/friends', 1, 1500)
+                .then(function(d) {
                     if (!d.success) return;
+                    connectionFailedWarned = false;
                     renderFriends(d.friends);
                     renderReceived(d.received);
                     renderSent(d.sent);
                 })
-                .catch(e => console.error(e));
+                .catch(function(e) {
+                    console.error(e);
+                    if (!connectionFailedWarned) {
+                        connectionFailedWarned = true;
+                        showToast('⚠️ 连接不稳定，自动重试中...', 'error');
+                    }
+                });
         }
 
         function renderFriends(friends) {
@@ -288,15 +314,14 @@
 
         // ===== 茶室 =====
         function loadRooms() {
-            fetch(API_BASE + '/chat/rooms')
-                .then(r => r.json())
-                .then(d => {
+            fetchSafe(API_BASE + '/chat/rooms', 1, 1500)
+                .then(function(d) {
                     if (!d.success) return;
                     var pub = d.data.filter(function(r) { return r.type === 'public'; });
                     var priv = d.data.filter(function(r) { return r.type === 'private'; });
                     renderRoomList('publicRooms', pub, '暂无公共茶室');
                     renderRoomList('privateRooms', priv, '添加友人后，私人茶室将自动创建~');
-                });
+                }).catch(function(e) { console.error('loadRooms failed:', e); });
         }
 
         function renderRoomList(id, rooms, emptyMsg) {

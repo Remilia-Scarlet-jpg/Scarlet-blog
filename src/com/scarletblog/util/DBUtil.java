@@ -1,39 +1,38 @@
 package com.scarletblog.util;
 
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.apache.tomcat.jdbc.pool.PoolProperties;
 import java.sql.*;
 
 /**
  * 红魔馆博客 - 数据库工具 (Aiven MySQL · Render 部署用)
- * 连接 Aiven 云端 MySQL，首次启动自动建表并插入示例数据
+ * 使用 Tomcat JDBC 连接池（tomcat-jdbc.jar，Tomcat 9 内置）
+ * 解决云端数据库连接不稳定、移动端加载慢等问题
  */
 public class DBUtil {
 
-    // 数据库连接 — 优先读环境变量，fallback 为 Aiven 默认值（Render 仅注入 DB_PASS）
+    // 数据库连接 — 优先读环境变量，fallback 为 Aiven 默认值
     private static final String DB_HOST = env("DB_HOST", "mysql-scarlet-blog-scarlet-blog.e.aivencloud.com");
     private static final String DB_PORT = env("DB_PORT", "11400");
     private static final String DB_NAME = env("DB_NAME", "defaultdb");
     private static final String DB_USER = env("DB_USER", "avnadmin");
     private static final String DB_PASS = env("DB_PASS", "");
 
-    private static final String URL =
+    private static final String JDBC_URL =
         "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
         + "?useUnicode=true&characterEncoding=UTF-8"
         + "&serverTimezone=Asia/Shanghai"
         + "&sslMode=REQUIRED"
-        + "&connectTimeout=30000";
+        + "&connectTimeout=10000"
+        + "&socketTimeout=30000"
+        + "&cachePrepStmts=true"
+        + "&useServerPrepStmts=true"
+        + "&prepStmtCacheSize=250"
+        + "&prepStmtCacheSqlLimit=2048"
+        + "&alwaysSendSetIsolation=false"
+        + "&useLocalSessionState=true";
 
-    /** CA 证书路径（Docker 容器内） */
-    private static String getCaPath() {
-        String path = System.getenv("CA_CERT_PATH");
-        return (path != null) ? path : "/usr/local/tomcat/ca.pem";
-    }
-    private static final String USER = DB_USER;
-    private static final String PASS = DB_PASS;
-
-    private static String env(String key, String fallback) {
-        String val = System.getenv(key);
-        return (val != null && !val.isEmpty()) ? val : fallback;
-    }
+    private static final DataSource ds = new DataSource();
 
     static {
         try {
@@ -41,34 +40,91 @@ public class DBUtil {
                 System.err.println("[DB] FATAL: DB_PASS 环境变量未设置！请在 Render Dashboard 或本地环境中配置数据库密码。");
                 throw new RuntimeException("DB_PASS 环境变量必须设置");
             }
-            Class.forName("com.mysql.cj.jdbc.Driver");
+
+            // 配置连接池
+            PoolProperties pp = new PoolProperties();
+            pp.setUrl(JDBC_URL);
+            pp.setUsername(DB_USER);
+            pp.setPassword(DB_PASS);
+            pp.setDriverClassName("com.mysql.cj.jdbc.Driver");
+
+            // 连接池大小
+            pp.setMaxActive(20);          // 最大并发连接
+            pp.setMinIdle(3);             // 最小空闲连接（保持热身）
+            pp.setMaxIdle(10);            // 最大空闲连接
+            pp.setInitialSize(3);         // 启动时预建 3 个连接
+
+            // 超时
+            pp.setMaxWait(8000);          // 等待可用连接的最长时间（8秒）
+            pp.setValidationQuery("SELECT 1");
+            pp.setValidationInterval(30000); // 30秒内不重复验证
+            pp.setTestOnBorrow(true);     // 借出前验证连接有效
+            pp.setTestOnReturn(false);
+            pp.setTestWhileIdle(true);
+
+            // 空闲清理
+            pp.setTimeBetweenEvictionRunsMillis(60000);  // 60秒清理一次
+            pp.setMinEvictableIdleTimeMillis(120000);    // 空闲120秒可被回收
+
+            // 异常连接清理（防止连接泄漏）
+            pp.setRemoveAbandoned(true);
+            pp.setRemoveAbandonedTimeout(60);  // 60秒未归还则强制回收
+            pp.setLogAbandoned(true);
+
+            // 连接初始化 SQL — 确保 SSL + 时区
+            pp.setInitSQL("SET time_zone = '+08:00'");
+
+            ds.setPoolProperties(pp);
+
+            // 首次启动时建表
             initDatabase();
+
+            System.out.println("[DB] Connection pool initialized: maxActive=20, minIdle=3, host=" + DB_HOST);
         } catch (Exception e) {
+            System.err.println("[DB] Failed to initialize connection pool: " + e.getMessage());
             e.printStackTrace();
+            throw new RuntimeException("Database pool initialization failed", e);
         }
     }
 
+    /** 从连接池获取连接 */
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(URL, USER, PASS);
+        try {
+            Connection conn = ds.getConnection();
+            if (conn == null) {
+                throw new SQLException("Connection pool exhausted — no connection available within timeout");
+            }
+            return conn;
+        } catch (SQLException e) {
+            // 连接池耗尽或网络问题
+            System.err.println("[DB] Failed to obtain connection: " + e.getMessage());
+            throw e;
+        }
     }
 
+    /** 归还连接到连接池 */
     public static void close(Connection conn, Statement stmt, ResultSet rs) {
         try { if (rs != null) rs.close(); } catch (SQLException e) {}
         try { if (stmt != null) stmt.close(); } catch (SQLException e) {}
-        try { if (conn != null) conn.close(); } catch (SQLException e) {}
+        try { if (conn != null) conn.close(); } catch (SQLException e) {}  // 归还到池中（不真正关闭）
     }
 
     public static void close(Connection conn, PreparedStatement pstmt, ResultSet rs) {
         try { if (rs != null) rs.close(); } catch (SQLException e) {}
         try { if (pstmt != null) pstmt.close(); } catch (SQLException e) {}
-        try { if (conn != null) conn.close(); } catch (SQLException e) {}
+        try { if (conn != null) conn.close(); } catch (SQLException e) {}  // 归还到池中
     }
 
-    /** 首次启动时自动建表和种子数据 */
+    // ===== 环境变量 =====
+    private static String env(String key, String fallback) {
+        String val = System.getenv(key);
+        return (val != null && !val.isEmpty()) ? val : fallback;
+    }
+
+    /** 首次启动时自动建表和种子数据（使用池中连接） */
     private static void initDatabase() {
-        System.out.println("[DB] Connecting to " + DB_HOST + ":" + DB_PORT + " user=" + DB_USER + " pass_set=" + (!PASS.isEmpty()));
-        System.out.println("[DB] URL: " + URL.substring(0, URL.indexOf("?")));
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+        System.out.println("[DB] Connecting to " + DB_HOST + ":" + DB_PORT + " user=" + DB_USER + " pass_set=" + (!DB_PASS.isEmpty()));
+        try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             System.out.println("[DB] Connected successfully!");
 
@@ -190,25 +246,23 @@ public class DBUtil {
                 "(6, '西行寺幽幽子', '宴会吗~？好期待啊~。我带樱花饼过去哦~。')," +
                 "(6, '伊吹萃香', '有酒吗！？我带酒来！！')");
 
-            // 种子数据 - 用户（PBKDF2 哈希: admin123 / maid123）
+            // 种子数据 - 用户（PBKDF2 哈希）
             stmt.execute("INSERT INTO users (username, password, nickname, avatar, role) VALUES " +
                 "('remilia', '" + SecurityUtil.hashPassword("admin123") + "', '蕾米莉亚·斯卡雷特', 'uploads/avatars/remilia.jpg', '馆主')," +
                 "('sakuya', '" + SecurityUtil.hashPassword("maid123") + "', '十六夜 咲夜', NULL, '女仆长')");
 
-            // 种子数据 - 公共茶室（红魔馆大厅）
+            // 种子数据 - 公共茶室
             stmt.execute("INSERT INTO chat_rooms (name, type, created_by) VALUES ('红魔馆大厅', 'public', 1)");
             stmt.execute("INSERT INTO chat_room_members (room_id, user_id) VALUES (1, 1), (1, 2)");
 
             } // end if (isNew)
-            // ===== 增量迁移：已有数据库补充新表 + 列类型修复 =====
+            // ===== 增量迁移：已有数据库补充新表 =====
             else {
-                // 头像列扩容：VARCHAR(500) → MEDIUMTEXT（支持 Base64）
+                // 头像列扩容
                 try {
                     stmt.execute("ALTER TABLE users MODIFY COLUMN avatar MEDIUMTEXT DEFAULT NULL");
                     System.out.println("[DB] Altered users.avatar to MEDIUMTEXT");
-                } catch (SQLException e) {
-                    // 可能已经是 MEDIUMTEXT，忽略
-                }
+                } catch (SQLException e) { /* 可能已经是 MEDIUMTEXT */ }
 
                 rs = stmt.executeQuery("SHOW TABLES LIKE 'friends'");
                 if (!rs.next()) {
