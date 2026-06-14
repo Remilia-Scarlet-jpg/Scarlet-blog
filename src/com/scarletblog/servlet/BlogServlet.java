@@ -806,10 +806,14 @@ public class BlogServlet extends HttpServlet {
             String action = req.getParameter("action");
             if ("accept".equals(action)) {
                 friendDAO.acceptRequest(id);
-                // 获取双方 ID，自动创建私人茶室
+                // 获取双方 ID，自动创建私人茶室（失败不影响接受结果）
                 Friend f = friendDAO.getById(id);
                 if (f != null) {
-                    chatDAO.createPrivateRoom(f.getUserId(), f.getFriendId());
+                    try {
+                        chatDAO.createPrivateRoom(f.getUserId(), f.getFriendId());
+                    } catch (Exception e) {
+                        System.err.println("[Chat] 创建私人茶室失败: " + e.getMessage());
+                    }
                 }
                 resp.getWriter().write("{\"success\":true,\"message\":\"友人已添加！茶室已备好。\"}");
             } else {

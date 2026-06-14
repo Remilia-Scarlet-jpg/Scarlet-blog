@@ -64,7 +64,7 @@
                     <div class="scarlet-card-body">
                         <div class="friend-request-form">
                             <input type="text" id="addFriendInput" placeholder="输入对方的名札（用户名）" maxlength="50">
-                            <button class="btn-scarlet" onclick="sendFriendRequest()" style="padding:8px 14px;">📨 发送</button>
+                            <button id="addFriendBtn" class="btn-scarlet" onclick="sendFriendRequest()" style="padding:8px 14px;">📨 发送</button>
                         </div>
                     </div>
                 </div>
@@ -262,17 +262,29 @@
 
         function sendFriendRequest() {
             var input = document.getElementById('addFriendInput');
+            var btn = document.querySelector('#addFriendBtn');
             var username = input.value.trim();
             if (!username) { showToast('请输入对方名札。', 'error'); return; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ 发送中...'; }
             fetch(API_BASE + '/friends', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'username=' + encodeURIComponent(username)
             })
-            .then(r => r.json())
-            .then(d => {
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function(d) {
                 if (d.success) { showToast(d.message, 'success'); input.value = ''; loadFriends(); }
                 else { showToast(d.error, 'error'); }
+            })
+            .catch(function(e) {
+                console.error(e);
+                showToast('📮 信使迷路了，请稍后再试。', 'error');
+            })
+            .then(function() {
+                if (btn) { btn.disabled = false; btn.textContent = '📨 发送'; }
             });
         }
 
