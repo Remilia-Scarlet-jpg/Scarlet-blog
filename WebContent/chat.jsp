@@ -107,9 +107,21 @@
         var API_BASE = '<%=ctxPath%>/api';
         var ctxPath = '<%=ctxPath%>';
         var currentUserId = <%= currentUser.getId() %>;
+        var lastReceivedCount = 0;
+        var isFirstLoad = true;
 
         // 页面加载
         loadAll();
+
+        // 实时轮询（每 4 秒检查新邀请函和茶室消息）
+        var pollFriendsTimer = setInterval(loadFriends, 4000);
+        var pollRoomsTimer = setInterval(loadRooms, 4000);
+
+        // 离开页面时停止轮询
+        window.addEventListener('beforeunload', function() {
+            clearInterval(pollFriendsTimer);
+            clearInterval(pollRoomsTimer);
+        });
 
         function loadAll() {
             loadFriends();
@@ -151,10 +163,22 @@
 
         function renderReceived(list) {
             var el = document.getElementById('receivedRequests');
+            var count = list ? list.length : 0;
+
+            // 检测新邀请函并弹通知
+            if (!isFirstLoad && count > lastReceivedCount) {
+                var newCount = count - lastReceivedCount;
+                showToast('📨 收到 ' + newCount + ' 封新邀请函！', 'success');
+            }
+            lastReceivedCount = count;
+            if (isFirstLoad) isFirstLoad = false;
+
             if (!list || list.length === 0) {
                 el.innerHTML = '<div class="empty-state-sm">暂无收到的邀请</div>';
+                updateInviteBadge(0);
                 return;
             }
+            updateInviteBadge(list.length);
             var html = '';
             list.forEach(function(f) {
                 html += '<div class="friend-item">' +
@@ -165,6 +189,33 @@
                     '</div></div>';
             });
             el.innerHTML = html;
+        }
+
+        // 更新邀请函徽标
+        function updateInviteBadge(count) {
+            var badge = document.getElementById('inviteBadge');
+            var header = document.querySelector('.scarlet-card-header');
+            if (count > 0) {
+                if (!badge) {
+                    // 在邀请函卡片标题处添加徽标
+                    var inviteCard = document.getElementById('receivedRequests').closest('.scarlet-card');
+                    if (inviteCard) {
+                        var hdr = inviteCard.querySelector('.scarlet-card-header');
+                        if (hdr) {
+                            badge = document.createElement('span');
+                            badge.id = 'inviteBadge';
+                            badge.className = 'nav-badge';
+                            hdr.appendChild(badge);
+                        }
+                    }
+                }
+                if (badge) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-block';
+                }
+            } else {
+                if (badge) badge.style.display = 'none';
+            }
         }
 
         function renderSent(list) {

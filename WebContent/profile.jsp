@@ -398,7 +398,7 @@
             <nav class="nav-links">
                 <a href="<%=ctxPath%>/blog">🏠 大厅</a>
                 <% if (currentUser != null && currentUser.isAdmin()) { %><a href="<%=ctxPath%>/blog/admin">⚙️ 管理室</a><% } %>
-                <a href="<%=ctxPath%>/blog/chat" title="茶话会">🍵 茶话会</a>
+                <a href="<%=ctxPath%>/blog/chat" title="茶话会" id="navChatLink">🍵 茶话会<span id="navChatBadge" class="nav-badge" style="display:none;">0</span></a>
                 <a href="<%=ctxPath%>/blog/profile" class="active">👤 档案</a>
                 <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light);border:1px solid var(--scarlet);">🚪 离馆</a>
             </nav>
@@ -961,5 +961,10 @@
             }, 3000);
         }
     </script>
+<% if (currentUser != null) { %>
+<script>
+(function(){fetch('<%=ctxPath%>/api/friends').then(function(r){return r.json()}).then(function(d){if(d.success){var c=(d.received&&d.received.length)||0;var b=document.getElementById('navChatBadge');if(b){if(c>0){b.textContent=c;b.style.display='inline-block'}else{b.style.display='none'}}}}).catch(function(){})})();
+</script>
+<% } %>
 </body>
 </html>

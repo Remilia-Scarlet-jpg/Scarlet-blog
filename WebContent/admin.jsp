@@ -34,7 +34,7 @@
                 <a href="<%=ctxPath%>/blog">🏠 大厅</a>
                 <a href="<%=ctxPath%>/blog/admin" class="active">⚙️ 管理室</a>
                 <% if (currentUser != null) { %>
-                    <a href="<%=ctxPath%>/blog/chat" title="茶话会">🍵 茶话会</a>
+                    <a href="<%=ctxPath%>/blog/chat" title="茶话会" id="navChatLink">🍵 茶话会<span id="navChatBadge" class="nav-badge" style="display:none;">0</span></a>
                     <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? (currentUser.getAvatar().startsWith("data:") ? currentUser.getAvatar() : ctxPath + "/" + currentUser.getAvatar()) : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
                              style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
@@ -503,5 +503,10 @@
             </div>
         </div>
     </div>
+<% if (currentUser != null) { %>
+<script>
+(function(){fetch('<%=ctxPath%>/api/friends').then(function(r){return r.json()}).then(function(d){if(d.success){var c=(d.received&&d.received.length)||0;var b=document.getElementById('navChatBadge');if(b){if(c>0){b.textContent=c;b.style.display='inline-block'}else{b.style.display='none'}}}}).catch(function(){})})();
+</script>
+<% } %>
 </body>
 </html>

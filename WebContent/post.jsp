@@ -31,7 +31,7 @@
                 <a href="<%=ctxPath%>/blog">🏠 大厅</a>
                 <% if (currentUser != null && currentUser.isAdmin()) { %><a href="<%=ctxPath%>/blog/admin">⚙️ 管理室</a><% } %>
                 <% if (currentUser != null) { %>
-                    <a href="<%=ctxPath%>/blog/chat" title="茶话会">🍵 茶话会</a>
+                    <a href="<%=ctxPath%>/blog/chat" title="茶话会" id="navChatLink">🍵 茶话会<span id="navChatBadge" class="nav-badge" style="display:none;">0</span></a>
                     <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? (currentUser.getAvatar().startsWith("data:") ? currentUser.getAvatar() : ctxPath + "/" + currentUser.getAvatar()) : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
                              style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
@@ -73,27 +73,29 @@
 
             <%-- 评论区 --%>
             <section class="comments-section">
-                <h3>💬 访客留言 (<%= comments != null ? comments.size() : 0 %>)</h3>
+                <h3>💬 访客留言 (<span id="commentCount"><%= comments != null ? comments.size() : 0 %></span>)</h3>
 
+                <div id="commentsContainer">
                 <% if (comments != null && !comments.isEmpty()) {
                     for (Comment c : comments) { %>
-                <div class="comment-item">
+                <div class="comment-item" data-comment-id="<%=c.getId()%>">
                     <div class="comment-author">👤 <%= HtmlUtil.escape(c.getAuthor() != null ? c.getAuthor() : "匿名访客") %></div>
                     <div class="comment-date">🕐 <%= c.getCreatedAt() != null ? sdf.format(c.getCreatedAt()) : "" %></div>
                     <div class="comment-content"><%= HtmlUtil.escape(c.getContent()) %></div>
                 </div>
                 <%     }
                    } else { %>
-                <p style="color:var(--text-muted);">暂无评论，来留下第一条吧~</p>
+                <p id="noCommentsMsg" style="color:var(--text-muted);">暂无评论，来留下第一条吧~</p>
                 <% } %>
+                </div>
 
                 <div class="comment-form">
                     <h4 style="color:var(--gold);margin-bottom:15px;">✎ 留下评论</h4>
-                    <form action="<%=ctxPath%>/api/comments" method="post" onsubmit="return submitCommentForm(this)">
+                    <form id="commentForm" onsubmit="return submitCommentForm(this)">
                         <input type="hidden" name="post_id" value="<%=post.getId()%>">
-                        <input type="text" name="author" placeholder="你的名字（幻想乡的住人）" maxlength="50">
-                        <textarea name="content" placeholder="在这里写下你的评论..." maxlength="1000" required></textarea>
-                        <button type="submit" class="btn-scarlet">📝 发布评论</button>
+                        <input type="text" name="author" id="commentAuthor" placeholder="你的名字（幻想乡的住人）" maxlength="50">
+                        <textarea name="content" id="commentContent" placeholder="在这里写下你的评论..." maxlength="1000" required></textarea>
+                        <button type="submit" class="btn-scarlet" id="commentSubmitBtn">📝 发布评论</button>
                     </form>
                 </div>
             </section>
@@ -115,29 +117,144 @@
 
     <script src="<%=ctxPath%>/js/lightbox.js"></script>
     <script>
+        var postId = <%= post != null ? post.getId() : 0 %>;
+        var lastCommentId = 0;
+        var renderedIds = {};
+
+        // 记录服务端已渲染的评论ID
+        (function() {
+            var items = document.querySelectorAll('#commentsContainer .comment-item');
+            items.forEach(function(el) {
+                var cid = parseInt(el.getAttribute('data-comment-id'));
+                if (cid > 0) {
+                    renderedIds[cid] = true;
+                    if (cid > lastCommentId) lastCommentId = cid;
+                }
+            });
+        })();
+
         function submitCommentForm(form) {
-            var content = form.querySelector('textarea[name="content"]');
+            var content = document.getElementById('commentContent');
+            var author = document.getElementById('commentAuthor');
+            var btn = document.getElementById('commentSubmitBtn');
             if (!content.value.trim()) {
                 alert('评论内容不能为空！');
                 return false;
             }
-            // Use AJAX to submit
+            btn.disabled = true;
+            btn.textContent = '⏳ 发送中...';
+
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', form.action, true);
+            xhr.open('POST', '<%=ctxPath%>/api/comments', true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
             xhr.onload = function() {
+                btn.disabled = false;
+                btn.textContent = '📝 发布评论';
                 if (xhr.status === 200) {
-                    location.reload();
+                    try {
+                        var resp = JSON.parse(xhr.responseText);
+                        if (resp.success) {
+                            // 立即追加新评论到 DOM（乐观更新）
+                            var now = new Date();
+                            var timeStr = now.getFullYear() + '年' +
+                                String(now.getMonth()+1).padStart(2,'0') + '月' +
+                                String(now.getDate()).padStart(2,'0') + '日 ' +
+                                String(now.getHours()).padStart(2,'0') + ':' +
+                                String(now.getMinutes()).padStart(2,'0');
+                            var authorName = escHtml(author.value.trim() || '匿名访客');
+                            var commentContent = escHtml(content.value.trim());
+                            appendCommentHtml(resp.id, authorName, timeStr, commentContent);
+                            // 清空输入框
+                            content.value = '';
+                            // 更新计数
+                            updateCommentCount(1);
+                            // 移除"暂无评论"
+                            var noMsg = document.getElementById('noCommentsMsg');
+                            if (noMsg) noMsg.remove();
+                        } else {
+                            alert(resp.error || '评论提交失败，请重试。');
+                        }
+                    } catch(e) { alert('评论提交失败，请重试。'); }
                 } else {
                     alert('评论提交失败，请重试。');
                 }
             };
-            var data = 'post_id=' + encodeURIComponent(form.post_id.value)
-                + '&author=' + encodeURIComponent(form.author.value || '匿名访客')
+            var data = 'post_id=' + encodeURIComponent(postId)
+                + '&author=' + encodeURIComponent(author.value || '匿名访客')
                 + '&content=' + encodeURIComponent(content.value);
             xhr.send(data);
             return false;
         }
+
+        function appendCommentHtml(id, author, time, content) {
+            if (renderedIds[id]) return;  // 已渲染，跳过
+            renderedIds[id] = true;
+            if (id > lastCommentId) lastCommentId = id;
+
+            var container = document.getElementById('commentsContainer');
+            var div = document.createElement('div');
+            div.className = 'comment-item';
+            div.setAttribute('data-comment-id', id);
+            div.style.cssText = 'animation:commentFadeIn 0.4s ease;';
+            div.innerHTML =
+                '<div class="comment-author">👤 ' + author + '</div>' +
+                '<div class="comment-date">🕐 ' + time + '</div>' +
+                '<div class="comment-content">' + content + '</div>';
+            container.appendChild(div);
+
+            // 滚动到新评论
+            div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function updateCommentCount(delta) {
+            var el = document.getElementById('commentCount');
+            if (el) {
+                el.textContent = parseInt(el.textContent) + delta;
+            }
+        }
+
+        // 30 秒轮询检查新评论
+        function pollNewComments() {
+            fetch('<%=ctxPath%>/api/posts/' + postId + '/comments')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (!d.success || !d.data) return;
+                    var newCount = 0;
+                    d.data.forEach(function(c) {
+                        if (!renderedIds[c.id]) {
+                            renderedIds[c.id] = true;
+                            if (c.id > lastCommentId) lastCommentId = c.id;
+                            var time = c.created_at ? new Date(c.created_at).toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+                            appendCommentHtml(c.id, escHtml(c.author || '匿名访客'), time, escHtml(c.content));
+                            newCount++;
+                        }
+                    });
+                    if (newCount > 0) {
+                        updateCommentCount(newCount);
+                        var noMsg = document.getElementById('noCommentsMsg');
+                        if (noMsg) noMsg.remove();
+                    }
+                })
+                .catch(function() {});  // 静默失败
+        }
+
+        var commentPollTimer = setInterval(pollNewComments, 30000);
+        window.addEventListener('beforeunload', function() { clearInterval(commentPollTimer); });
+
+        function escHtml(s) {
+            if (!s) return '';
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // 注入淡入动画 CSS
+        var style = document.createElement('style');
+        style.textContent = '@keyframes commentFadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}';
+        document.head.appendChild(style);
     </script>
+<% if (currentUser != null) { %>
+<script>
+(function(){fetch('<%=ctxPath%>/api/friends').then(function(r){return r.json()}).then(function(d){if(d.success){var c=(d.received&&d.received.length)||0;var b=document.getElementById('navChatBadge');if(b){if(c>0){b.textContent=c;b.style.display='inline-block'}else{b.style.display='none'}}}}).catch(function(){})})();
+</script>
+<% } %>
 </body>
 </html>

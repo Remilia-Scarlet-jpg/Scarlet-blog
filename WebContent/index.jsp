@@ -41,7 +41,7 @@
                     <a href="<%=ctxPath%>/blog/admin" title="管理室">⚙️ 管理室</a>
                 <% } %>
                 <% if (currentUser != null) { %>
-                    <a href="<%=ctxPath%>/blog/chat" title="茶话会">🍵 茶话会</a>
+                    <a href="<%=ctxPath%>/blog/chat" title="茶话会" id="navChatLink">🍵 茶话会<span id="navChatBadge" class="nav-badge" style="display:none;">0</span></a>
                     <a href="#" onclick="openCreatePostModal();return false;" title="撰写文章">📝 撰写</a>
                     <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? (currentUser.getAvatar().startsWith("data:") ? currentUser.getAvatar() : ctxPath + "/" + currentUser.getAvatar()) : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
@@ -344,6 +344,50 @@
         document.getElementById('postModalIndex').addEventListener('click', function(e) {
             if (e.target === this) closeCreatePostModal();
         });
+    </script>
+    <% } %>
+
+    <%-- 全局茶话会通知轮询（仅登录用户） --%>
+    <% if (currentUser != null) { %>
+    <script>
+    (function() {
+        var lastInviteCount = 0;
+        function pollFriendRequests() {
+            fetch('<%=ctxPath%>/api/friends')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (!d.success) return;
+                    var count = (d.received && d.received.length) ? d.received.length : 0;
+                    var badge = document.getElementById('navChatBadge');
+                    if (badge) {
+                        if (count > 0) {
+                            badge.textContent = count;
+                            badge.style.display = 'inline-block';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                    // 检测到新邀请函时弹通知
+                    if (count > lastInviteCount && lastInviteCount > 0) {
+                        var toast = document.createElement('div');
+                        toast.className = 'toast success';
+                        toast.textContent = '📨 收到新邀请函！点击茶话会查看';
+                        toast.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;';
+                        document.body.appendChild(toast);
+                        setTimeout(function() {
+                            toast.style.opacity = '0';
+                            toast.style.transition = 'all 0.5s';
+                            setTimeout(function() { toast.remove(); }, 500);
+                        }, 4000);
+                    }
+                    lastInviteCount = count;
+                })
+                .catch(function() {});  // 静默失败
+        }
+        // 每 30 秒检查一次（大厅页面低频轮询）
+        pollFriendRequests();
+        setInterval(pollFriendRequests, 30000);
+    })();
     </script>
     <% } %>
 </body>
