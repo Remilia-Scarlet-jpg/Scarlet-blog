@@ -1,4 +1,4 @@
-src/
+bin/
 auth_migration.sql
 *.zip
 *.md
