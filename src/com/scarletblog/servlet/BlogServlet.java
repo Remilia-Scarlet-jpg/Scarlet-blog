@@ -316,23 +316,21 @@ public class BlogServlet extends HttpServlet {
 
             if (filePart != null && filePart.getSize() > 0) {
                 String fileName = getSubmittedFileName(filePart);
-                String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf(".")) : ".jpg";
+                String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf(".")).toLowerCase() : ".jpg";
                 // 只允许图片格式
                 if (!ext.matches("\\.(jpg|jpeg|png|gif|webp)$")) {
                     resp.getWriter().write("{\"success\":false,\"error\":\"头像仅支持 JPG/PNG/GIF/WebP 格式。\"}");
                     return;
                 }
-                // 脱敏用户名以防路径穿越（仅允许字母数字下划线）
-                String safeName = user.getUsername().replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fff]", "_");
-                String savedName = safeName + "_" + System.currentTimeMillis() + ext;
-                String uploadDir = req.getServletContext().getRealPath("/uploads/avatars");
-                Path uploadPath = Paths.get(uploadDir);
-                if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
-                Path filePath = uploadPath.resolve(savedName);
+                // 转 Base64 存入数据库（容器磁盘不持久化）
+                String mime = ext.equals(".webp") ? "image/webp" : ext.equals(".gif") ? "image/gif" :
+                    ext.equals(".png") ? "image/png" : "image/jpeg";
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
                 try (InputStream is = filePart.getInputStream()) {
-                    Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
+                    byte[] buf = new byte[8192]; int n;
+                    while ((n = is.read(buf)) != -1) baos.write(buf, 0, n);
                 }
-                avatar = "uploads/avatars/" + savedName;
+                avatar = "data:" + mime + ";base64," + java.util.Base64.getEncoder().encodeToString(baos.toByteArray());
             }
 
             boolean ok = userDAO.updateProfile(user.getId(), nickname, avatar);

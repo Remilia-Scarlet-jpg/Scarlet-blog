@@ -119,7 +119,7 @@
             if (empty) empty.remove();
 
             var isSelf = m.sender_id === currentUserId;
-            var avatar = m.sender_avatar ? ctxPath + '/' + m.sender_avatar : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%234a0000%22/%3E%3C/svg%3E';
+            var avatar = m.sender_avatar ? (m.sender_avatar.startsWith('data:') ? m.sender_avatar : ctxPath + '/' + m.sender_avatar) : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%234a0000%22/%3E%3C/svg%3E';
             var time = new Date(m.created_at).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
 
             var div = document.createElement('div');

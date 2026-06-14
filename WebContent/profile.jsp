@@ -11,7 +11,7 @@
     String avatarPath = currentUser.getAvatar();
     if (avatarPath == null || avatarPath.isEmpty()) {
         avatarPath = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234a0000'/%3E%3Ctext x='50' y='65' text-anchor='middle' font-size='40'%3E%F0%9F%91%A4%3C/text%3E%3C/svg%3E";
-    } else {
+    } else if (!avatarPath.startsWith("data:")) {
         avatarPath = ctxPath + "/" + avatarPath;
     }
 %>

@@ -117,7 +117,7 @@ public class DBUtil {
                 "username VARCHAR(50) NOT NULL UNIQUE," +
                 "password VARCHAR(255) NOT NULL," +
                 "nickname VARCHAR(50) DEFAULT '匿名访客'," +
-                "avatar VARCHAR(500) DEFAULT NULL," +
+                "avatar MEDIUMTEXT DEFAULT NULL," +
                 "role VARCHAR(20) DEFAULT '住人'," +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -200,8 +200,16 @@ public class DBUtil {
             stmt.execute("INSERT INTO chat_room_members (room_id, user_id) VALUES (1, 1), (1, 2)");
 
             } // end if (isNew)
-            // ===== 增量迁移：已有数据库补充新表 =====
+            // ===== 增量迁移：已有数据库补充新表 + 列类型修复 =====
             else {
+                // 头像列扩容：VARCHAR(500) → MEDIUMTEXT（支持 Base64）
+                try {
+                    stmt.execute("ALTER TABLE users MODIFY COLUMN avatar MEDIUMTEXT DEFAULT NULL");
+                    System.out.println("[DB] Altered users.avatar to MEDIUMTEXT");
+                } catch (SQLException e) {
+                    // 可能已经是 MEDIUMTEXT，忽略
+                }
+
                 rs = stmt.executeQuery("SHOW TABLES LIKE 'friends'");
                 if (!rs.next()) {
                     System.out.println("[DB] Creating incremental table: friends");
