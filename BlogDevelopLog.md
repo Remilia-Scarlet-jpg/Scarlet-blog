@@ -110,6 +110,28 @@ JS 通过 `e.target.closest('.btn-edit-post')` 读取 `dataset` 调用函数。
 
 ---
 
+### 十一、Docker 构建修复
+
+**问题**：`bin/` 目录从仓库移除后，Dockerfile 仍引用 `COPY bin/...`，Render 部署报 500。
+
+**修改**：
+- `Dockerfile` — 改为容器内 `javac` 现场编译 Java 源码，不再依赖预编译 class
+- `.dockerignore` — `src/` → `bin/`（Docker 构建需源码）
+
+### 十二、管理员用户列表 API
+
+**新增**：`GET /api/admin/users` — 仅馆主/女仆长可访问，返回全部用户（id/username/nickname/role/avatar/createdAt，不含密码）
+
+**修改**：`UserDAO.java` 新增 `getAllUsers()` 方法
+
+### 十三、DB 连接恢复
+
+**问题**：改动 6 将 `DB_HOST` 等默认值改为 `localhost`，但 Render 仅有 `DB_PASS` 环境变量，导致连不上 Aiven MySQL。
+
+**修复**：在 Render Dashboard 添加 `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` 四个环境变量，代码维持无害默认值。
+
+---
+
 ## 提交记录
 
 | commit | 内容 |
@@ -117,6 +139,9 @@ JS 通过 `e.target.closest('.btn-edit-post')` 读取 `dataset` 调用函数。
 | `6a1f106` | 注册自动登录 + 角色分流 + QQ头像裁剪 + 按钮防重复 |
 | `acd52f0` | XSS全站防护 + CSRF + 硬编码移除 + Session加固 + 路径穿越 + .gitignore |
 | `43ac067` | 验证码升级为随机题库 |
+| `c9cb8ca` | Dockerfile 改为构建时编译 Java 源码 |
+| `84d5777` | 管理员用户列表 API |
+| `d32db6b` | 开发日志 BlogDevelopLog.md |
 
 ---
 
