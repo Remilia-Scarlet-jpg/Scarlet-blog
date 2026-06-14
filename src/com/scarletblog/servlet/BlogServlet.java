@@ -177,12 +177,12 @@ public class BlogServlet extends HttpServlet {
                 return;
             }
             String expectedCaptcha = (String) session.getAttribute("captchaAnswer");
-            if (captcha == null || !captcha.trim().equals(expectedCaptcha)) {
-                session.removeAttribute("captchaAnswer"); // 验证码一次性
+            if (captcha == null || !captcha.trim().equalsIgnoreCase(expectedCaptcha)) {
+                session.removeAttribute("captchaAnswer");
                 resp.getWriter().write("{\"success\":false,\"error\":\"验证码错误，请重新输入。\"}");
                 return;
             }
-            session.removeAttribute("captchaAnswer"); // 验证码一次性
+            session.removeAttribute("captchaAnswer");
 
             if (username == null || password == null || username.trim().isEmpty()) {
                 resp.getWriter().write("{\"success\":false,\"error\":\"请出示你的名札（用户名不能为空）！\"}");
@@ -219,7 +219,7 @@ public class BlogServlet extends HttpServlet {
                 return;
             }
             String expected = (String) session.getAttribute("captchaAnswer");
-            if (captcha == null || !captcha.trim().equals(expected)) {
+            if (captcha == null || !captcha.trim().equalsIgnoreCase(expected)) {
                 session.removeAttribute("captchaAnswer");
                 resp.getWriter().write("{\"success\":false,\"error\":\"验证码错误，请重新输入。\"}");
                 return;
@@ -259,15 +259,13 @@ public class BlogServlet extends HttpServlet {
                 resp.getWriter().write("{\"success\":false,\"error\":\"登记失败，请稍后再试。\"}");
             }
         }
-        // GET /api/auth/captcha — 获取验证码
+        // GET /api/auth/captcha — 获取验证码（随机题库）
         else if (path.equals("/api/auth/captcha") && method.equals("GET")) {
             resp.setContentType("application/json;charset=UTF-8");
             HttpSession session = req.getSession(true);
-            int a = new SecureRandom().nextInt(10) + 1;
-            int b = new SecureRandom().nextInt(10) + 1;
-            String question = a + " + " + b + " = ?";
-            session.setAttribute("captchaAnswer", String.valueOf(a + b));
-            resp.getWriter().write("{\"success\":true,\"question\":\"" + question + "\"}");
+            String[] qa = pickCaptcha();
+            session.setAttribute("captchaAnswer", qa[1]);
+            resp.getWriter().write("{\"success\":true,\"question\":\"" + escapeJson(qa[0]) + "\"}");
         }
         // GET /api/auth/me — 查看当前访客
         else if (path.equals("/api/auth/me") && method.equals("GET")) {
@@ -601,6 +599,44 @@ public class BlogServlet extends HttpServlet {
         // 取第一个非代理 IP
         int comma = ip.indexOf(',');
         return comma > 0 ? ip.substring(0, comma).trim() : ip.trim();
+    }
+
+    /** 验证码题库 — 混合数学 + 东方/红魔馆趣味问答 */
+    private static final String[][] CAPTCHAS = {
+        // 数学混合运算
+        {"3 × 7 + 2 = ?", "23"},
+        {"15 + 28 = ?", "43"},
+        {"100 − 37 = ?", "63"},
+        {"6 × 8 = ?", "48"},
+        {"56 ÷ 7 = ?", "8"},
+        {"9 × 9 − 10 = ?", "71"},
+        {"144 ÷ 12 = ?", "12"},
+        {"25 + 36 = ?", "61"},
+        // 红魔馆 / 东方趣味问答
+        {"红魔馆的主人叫什么？（2个字）", "蕾米"},
+        {"红魔馆的女仆长叫什么？（2个字）", "咲夜"},
+        {"蕾米莉亚的妹妹叫？（2个字）", "芙兰"},
+        {"帕秋莉擅长什么？（2个字）", "魔法"},
+        {"雾雨魔理沙用的是？（2个字）", "八卦炉"},
+        {"博丽神社的巫女叫？（2个字）", "灵梦"},
+        {"十六夜咲夜的能力是操纵？（2个字）", "时间"},
+        {"红魔馆的门卫叫？（2个字）", "美铃"},
+        {"红魔馆有几个主要住人？（数字）", "5"},
+        {"幻想乡的巫女靠什么为生？（2个字）", "赛钱"},
+        {"⑨ 是指幻想乡的谁？（2个字）", "琪露诺"},
+        {"永远亭的公主叫？（2个字）", "辉夜"},
+        {"八云紫的能力是操纵？（2个字）", "境界"},
+        {"幽幽子住在哪里？（2个字）", "白玉楼"},
+        {"咲夜泡红茶需要几分钟？（数字）", "3"},
+        {"帕秋莉的图书馆在红魔馆的？（2个字）", "地下"},
+        {"芙兰朵露的能力是破坏？（2个字）", "一切"},
+        {"灵梦的必杀技是？（4个字）", "梦想封印"},
+        {"魔理沙的必杀技是？（4个字）", "魔炮"},
+        {"蕾米莉亚的种族是？（2个字）", "吸血鬼"},
+    };
+
+    private String[] pickCaptcha() {
+        return CAPTCHAS[new SecureRandom().nextInt(CAPTCHAS.length)];
     }
 
     private User getCurrentUser(HttpServletRequest req) {
