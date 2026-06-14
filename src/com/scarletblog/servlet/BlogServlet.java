@@ -271,6 +271,8 @@ public class BlogServlet extends HttpServlet {
             if (id > 0) {
                 newUser.setId(id);
                 newUser.setRole("住人");  // 新登记默认身份
+                // 自动加入所有公共茶室
+                try { chatDAO.addUserToPublicRooms(id); } catch (Exception e) {}
                 // 登记成功，自动入馆 —— Session 加固
                 HttpSession oldSession = req.getSession(false);
                 if (oldSession != null) oldSession.invalidate();

@@ -140,6 +140,22 @@ public class ChatDAO {
         }
     }
 
+    /** 新注册用户自动加入所有公共茶室 */
+    public void addUserToPublicRooms(int userId) throws SQLException {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(
+                "INSERT IGNORE INTO chat_room_members (room_id, user_id) " +
+                "SELECT id, ? FROM chat_rooms WHERE type = 'public'");
+            pstmt.setInt(1, userId);
+            pstmt.executeUpdate();
+        } finally {
+            DBUtil.close(conn, pstmt, null);
+        }
+    }
+
     /** 添加全部注册用户到公共茶室 */
     public void addAllUsersToRoom(int roomId) throws SQLException {
         Connection conn = null;

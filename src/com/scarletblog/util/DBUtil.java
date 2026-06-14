@@ -278,6 +278,11 @@ public class DBUtil {
                     stmt.execute("INSERT INTO chat_rooms (name, type, created_by) VALUES ('红魔馆大厅', 'public', 1)");
                     stmt.execute("INSERT INTO chat_room_members (room_id, user_id) VALUES (1, 1), (1, 2)");
                 }
+                rs.close();
+
+                // 确保所有已注册用户都在公共茶室中
+                stmt.execute("INSERT IGNORE INTO chat_room_members (room_id, user_id) " +
+                    "SELECT cr.id, u.id FROM chat_rooms cr CROSS JOIN users u WHERE cr.type = 'public'");
             }
 
         } catch (SQLException e) {
