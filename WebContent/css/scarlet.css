@@ -1617,15 +1617,15 @@ a, button, .btn-scarlet, .btn-scarlet-outline {
 .friend-actions button.btn-reject:hover { border-color: var(--scarlet-fire); color: var(--scarlet-fire); }
 
 .friend-request-form {
-    display: flex; gap: 8px; margin-top: 12px;
+    display: flex; flex-direction: column; gap: 8px; margin-top: 12px;
 }
 .friend-request-form input {
-    flex: 1; background: var(--bg-dark);
+    width: 100%; background: var(--bg-dark);
     border: 1px solid var(--border-dark); color: var(--text-light);
     padding: 8px 12px; border-radius: 3px; font-size: 0.85rem;
 }
 .friend-request-form button {
-    padding: 8px 14px; font-size: 0.8rem;
+    padding: 8px 14px; font-size: 0.8rem; align-self: flex-start;
 }
 
 /* 消息列表 */
