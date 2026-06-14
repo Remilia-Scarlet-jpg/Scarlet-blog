@@ -10,6 +10,9 @@
    CSS 変数 - 紅魔館の色
    ============================================ */
 :root {
+    /* 流体基础字号 — 随屏幕宽度平滑缩放 */
+    font-size: clamp(14px, 1.8vw, 18px);
+
     /* 深紅のパレット */
     --scarlet-darkest: #1a0000;
     --scarlet-deeper: #2d0000;
@@ -1300,5 +1303,144 @@ body {
         left: 10px;
         right: 10px;
         max-width: none;
+    }
+}
+
+/* ─── 横竖屏切换 ─── */
+
+/* 手机横屏：宽但矮 */
+@media (orientation: landscape) and (max-height: 500px) {
+    .scarlet-header {
+        position: relative;  /* 不 sticky，给内容更多空间 */
+    }
+    .header-inner {
+        padding: 8px 15px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    .logo-icon {
+        font-size: 1.5rem;
+    }
+    .logo-text h1 {
+        font-size: 1rem;
+    }
+    .logo-text .subtitle {
+        display: none;
+    }
+    .nav-links a {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+    .hero-section {
+        padding: 20px;
+    }
+    .hero-section h2 {
+        font-size: 1.2rem;
+    }
+    .main-container {
+        grid-template-columns: 1fr;  /* 单列 */
+    }
+    .sidebar {
+        display: none;  /* 横屏隐藏侧栏 */
+    }
+    .carousel-container {
+        max-height: 160px;
+    }
+    .auth-container {
+        min-height: auto;
+        padding: 10px 20px;
+    }
+    .auth-card {
+        padding: 20px 25px;
+    }
+}
+
+/* 平板竖屏 */
+@media (orientation: portrait) and (min-width: 600px) and (max-width: 900px) {
+    .post-card-body {
+        padding: 20px 25px;
+    }
+    .sidebar {
+        display: block;
+    }
+    .main-container {
+        grid-template-columns: 1fr 280px;
+    }
+}
+
+/* ─── 极小屏手机 (iPhone SE 等 <375px) ─── */
+@media (max-width: 375px) {
+    :root {
+        font-size: 13px;  /* 缩小基础字号 */
+    }
+    .logo-icon {
+        font-size: 1.5rem;
+    }
+    .logo-text h1 {
+        font-size: 1.1rem;
+    }
+    .logo-text .subtitle {
+        font-size: 0.6rem;
+    }
+    .header-inner {
+        padding: 10px;
+    }
+    .nav-links {
+        gap: 2px;
+    }
+    .nav-links a {
+        padding: 5px 7px;
+        font-size: 0.68rem;
+    }
+    .post-card-body {
+        padding: 12px;
+    }
+    .post-card-title {
+        font-size: 0.95rem;
+    }
+    .post-card-meta span {
+        font-size: 0.68rem;
+    }
+    .auth-card {
+        padding: 20px 15px;
+    }
+    .auth-card h2 {
+        font-size: 1.1rem;
+    }
+    .btn-scarlet {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    .carousel-container {
+        max-height: 130px;
+    }
+    .carousel-arrow {
+        padding: 5px 8px;
+        font-size: 0.7rem;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+    }
+    .stat-card {
+        padding: 12px 8px;
+    }
+    .stat-value {
+        font-size: 1.3rem;
+    }
+    .stat-label {
+        font-size: 0.65rem;
+    }
+    .admin-table {
+        font-size: 0.7rem;
+    }
+    .admin-table th, .admin-table td {
+        padding: 6px 8px;
+    }
+    .article-full {
+        padding: 12px;
+    }
+    .article-full h1 {
+        font-size: 1.2rem;
     }
 }
