@@ -124,7 +124,19 @@ JS 通过 `e.target.closest('.btn-edit-post')` 读取 `dataset` 调用函数。
 
 **修改**：`UserDAO.java` 新增 `getAllUsers()` 方法
 
-### 十三、DB 连接恢复
+### 十三、离馆跳转 + 移动端适配
+
+**离馆**：`/api/auth/logout` 原来返回 JSON 不跳转，改为 `resp.sendRedirect("/blog")` 直接回大厅。
+
+**移动端**：`scarlet.css` 三层响应式断点
+
+| 断点 | 适配内容 |
+|------|----------|
+| ≤900px | 侧栏下移、header 纵向、管理表格横向滚动、文章 meta 换行、轮播缩小 |
+| ≤600px | 导航紧凑、模态框全宽、分页按钮缩小、评论卡片缩进、裁剪区纵向布局 |
+| ≤400px | 超小屏：导航最小化、统计 2 列、认证卡片紧凑、轮播 150px、Logo 缩小、Toast 全宽 |
+
+### 十四、DB 连接恢复
 
 **问题**：改动 6 将 `DB_HOST` 等默认值改为 `localhost`，但 Render 仅有 `DB_PASS` 环境变量，导致连不上 Aiven MySQL。
 
