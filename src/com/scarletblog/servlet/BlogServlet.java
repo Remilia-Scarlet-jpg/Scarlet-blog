@@ -78,6 +78,8 @@ public class BlogServlet extends HttpServlet {
                 handleStatsAPI(req, resp);
             } else if (path.equals("/api/health")) {
                 handleHealth(req, resp);
+            } else if (path.equals("/api/admin/users")) {
+                handleAdminUsers(req, resp);
             } else {
                 req.getRequestDispatcher("/index.jsp").forward(req, resp);
             }
@@ -569,6 +571,36 @@ public class BlogServlet extends HttpServlet {
             sb.append(",\"db\":\"error\"");
         }
         sb.append("}");
+        resp.getWriter().write(sb.toString());
+    }
+
+    /** 管理员查看用户列表 */
+    private void handleAdminUsers(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        resp.setContentType("application/json;charset=UTF-8");
+        User currentUser = getCurrentUser(req);
+        if (currentUser == null) {
+            resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+            return;
+        }
+        if (!currentUser.isAdmin()) {
+            resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主或女仆长可查看。\"}");
+            return;
+        }
+        List<User> users = userDAO.getAllUsers();
+        StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":[");
+        for (int i = 0; i < users.size(); i++) {
+            User u = users.get(i);
+            if (i > 0) sb.append(",");
+            sb.append("{\"id\":").append(u.getId());
+            sb.append(",\"username\":\"").append(escapeJson(u.getUsername())).append("\"");
+            sb.append(",\"nickname\":\"").append(escapeJson(u.getNickname())).append("\"");
+            sb.append(",\"role\":\"").append(escapeJson(u.getRole())).append("\"");
+            sb.append(",\"avatar\":").append(u.getAvatar() != null ? "\"" + escapeJson(u.getAvatar()) + "\"" : "null");
+            sb.append(",\"createdAt\":\"").append(u.getCreatedAt() != null ? u.getCreatedAt().toString() : "").append("\"");
+            sb.append("}");
+        }
+        sb.append("]}");
         resp.getWriter().write(sb.toString());
     }
 
