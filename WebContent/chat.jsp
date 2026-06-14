@@ -133,9 +133,9 @@
         // 页面加载
         loadAll();
 
-        // 实时轮询（每 4 秒检查新邀请函和茶室消息）
-        var pollFriendsTimer = setInterval(loadFriends, 4000);
-        var pollRoomsTimer = setInterval(loadRooms, 4000);
+        // 实时轮询（友人 2 秒，茶室 5 秒）
+        var pollFriendsTimer = setInterval(loadFriends, 2000);
+        var pollRoomsTimer = setInterval(loadRooms, 5000);
 
         // 离开页面时停止轮询
         window.addEventListener('beforeunload', function() {
@@ -210,8 +210,8 @@
                 html += '<div class="friend-item">' +
                     '<span class="friend-name">' + escHtml(f.nickname || f.username) + '</span>' +
                     '<div class="friend-actions">' +
-                    '<button class="btn-accept" onclick="acceptRequest(' + f.id + ')">接受</button>' +
-                    '<button class="btn-reject" onclick="rejectRequest(' + f.id + ')">婉拒</button>' +
+                    '<button class="btn-accept" onclick="acceptRequest(' + f.id + ',this)">接受</button>' +
+                    '<button class="btn-reject" onclick="rejectRequest(' + f.id + ',this)">婉拒</button>' +
                     '</div></div>';
             });
             el.innerHTML = html;
@@ -276,29 +276,54 @@
             });
         }
 
-        function acceptRequest(id) {
+        function acceptRequest(id, btn) {
+            // 乐观更新：立即从邀请列表移除，追加到友人列表
+            var item = btn ? btn.closest('.friend-item') : null;
+            var nameEl = item ? item.querySelector('.friend-name') : null;
+            var nickname = nameEl ? nameEl.textContent : '友人';
+            if (item) item.style.opacity = '0.3';
+
             fetch(API_BASE + '/friends/' + id, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'action=accept'
             })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) { showToast(d.message, 'success'); loadAll(); }
-                else { showToast(d.error, 'error'); }
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) {
+                    showToast(d.message, 'success');
+                    loadAll(); // 完整刷新（含新建的私人茶室）
+                } else {
+                    showToast(d.error, 'error');
+                    if (item) item.style.opacity = '1'; // 恢复
+                }
+            }).catch(function() {
+                showToast('操作失败，请重试', 'error');
+                if (item) item.style.opacity = '1';
             });
         }
 
-        function rejectRequest(id) {
+        function rejectRequest(id, btn) {
+            var item = btn ? btn.closest('.friend-item') : null;
+            if (item) item.style.opacity = '0.3';
+
             fetch(API_BASE + '/friends/' + id, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'action=reject'
             })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) { showToast(d.message, 'success'); loadFriends(); }
-                else { showToast(d.error, 'error'); }
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) {
+                    showToast(d.message, 'success');
+                    loadFriends(); // 刷新邀请列表
+                } else {
+                    showToast(d.error, 'error');
+                    if (item) item.style.opacity = '1';
+                }
+            }).catch(function() {
+                showToast('操作失败，请重试', 'error');
+                if (item) item.style.opacity = '1';
             });
         }
 
