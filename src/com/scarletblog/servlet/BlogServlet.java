@@ -236,8 +236,15 @@ public class BlogServlet extends HttpServlet {
             int id = userDAO.register(newUser);
 
             if (id > 0) {
-                resp.getWriter().write("{\"success\":true,\"message\":\"来馆登记完成！欢迎成为红魔馆的住人，"
-                    + newUser.getNickname() + "。请用你的名札和封印密语入馆。\"}");
+                newUser.setId(id);
+                newUser.setRole("住人");  // 新登记默认身份
+                // 登记成功，自动入馆 —— Session 加固
+                HttpSession oldSession = req.getSession(false);
+                if (oldSession != null) oldSession.invalidate();
+                HttpSession newSession = req.getSession(true);
+                newSession.setAttribute("user", newUser);
+                newSession.setMaxInactiveInterval(60 * 60 * 24); // 24小时
+                resp.getWriter().write(toUserJson(newUser));
             } else {
                 resp.getWriter().write("{\"success\":false,\"error\":\"登记失败，请稍后再试。\"}");
             }

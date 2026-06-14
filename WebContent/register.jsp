@@ -182,7 +182,7 @@
                     </div>
                     <input type="text" id="captcha" placeholder="请输入答案" maxlength="5" required style="margin-top:8px;width:100%;background:var(--bg-dark);border:1px solid var(--border-dark);color:var(--text-light);padding:10px 15px;font-family:var(--font-jp);font-size:0.9rem;border-radius:4px;">
                 </div>
-                <button type="submit" class="btn-scarlet">📝 登记入馆</button>
+                <button type="submit" class="btn-scarlet" id="registerSubmitBtn">📝 登记入馆</button>
             </form>
 
             <div class="auth-footer">
@@ -215,6 +215,7 @@
             var captcha = document.getElementById('captcha').value.trim();
             var errorBox = document.getElementById('errorMsg');
             var successBox = document.getElementById('successMsg');
+            var btn = document.getElementById('registerSubmitBtn');
             errorBox.classList.remove('show');
             successBox.classList.remove('show');
 
@@ -231,6 +232,10 @@
                 return;
             }
 
+            // 防止重复提交
+            btn.disabled = true;
+            btn.textContent = '⏳ 登记中...';
+
             try {
                 var formData = 'username=' + encodeURIComponent(username)
                     + '&password=' + encodeURIComponent(password)
@@ -243,20 +248,29 @@
                 });
                 var data = await resp.json();
                 if (data.success) {
-                    // 登记成功
+                    // 登记成功，自动入馆
                     successBox.textContent = data.message;
                     successBox.classList.add('show');
                     document.getElementById('registerForm').style.display = 'none';
-                    // 2秒后跳转到登录页
+                    // 2秒后按角色跳转
                     setTimeout(function() {
-                        window.location.href = '<%=ctxPath%>/blog/login';
+                        var role = data.data && data.data.role;
+                        if (role === '馆主' || role === '女仆长') {
+                            window.location.href = '<%=ctxPath%>/blog/admin';
+                        } else {
+                            window.location.href = '<%=ctxPath%>/blog';
+                        }
                     }, 2500);
                 } else {
                     refreshCaptcha();
                     showError(data.error || '来馆登记失败。');
+                    btn.disabled = false;
+                    btn.textContent = '📝 登记入馆';
                 }
             } catch (err) {
                 showError('红魔馆大门暂时无法连接，请稍后再试。');
+                btn.disabled = false;
+                btn.textContent = '📝 登记入馆';
             }
         }
 
@@ -264,7 +278,6 @@
             var box = document.getElementById('errorMsg');
             box.textContent = msg;
             box.classList.add('show');
-            setTimeout(function() { box.classList.remove('show'); }, 5000);
         }
     </script>
 </body>

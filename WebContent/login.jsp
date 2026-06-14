@@ -166,7 +166,7 @@
                     </div>
                     <input type="text" id="captcha" placeholder="请输入答案" maxlength="5" required style="margin-top:8px;width:100%;background:var(--bg-dark);border:1px solid var(--border-dark);color:var(--text-light);padding:10px 15px;font-family:var(--font-jp);font-size:0.9rem;border-radius:4px;">
                 </div>
-                <button type="submit" class="btn-scarlet">⚜️ 入馆</button>
+                <button type="submit" class="btn-scarlet" id="loginSubmitBtn">⚜️ 入馆</button>
             </form>
 
             <div class="auth-footer">
@@ -197,6 +197,7 @@
             var password = document.getElementById('password').value;
             var captcha = document.getElementById('captcha').value.trim();
             var errorBox = document.getElementById('errorMsg');
+            var btn = document.getElementById('loginSubmitBtn');
 
             if (!username || !password) {
                 showError('请出示你的名札和封印密语。');
@@ -206,6 +207,10 @@
                 showError('请输入验证码。');
                 return;
             }
+
+            // 防止重复提交
+            btn.disabled = true;
+            btn.textContent = '⏳ 入馆中...';
 
             try {
                 var formData = 'username=' + encodeURIComponent(username)
@@ -218,14 +223,23 @@
                 });
                 var data = await resp.json();
                 if (data.success) {
-                    // 登录成功，跳转到管理室
-                    window.location.href = '<%=ctxPath%>/blog/admin';
+                    // 登录成功，按角色跳转
+                    var role = data.data && data.data.role;
+                    if (role === '馆主' || role === '女仆长') {
+                        window.location.href = '<%=ctxPath%>/blog/admin';
+                    } else {
+                        window.location.href = '<%=ctxPath%>/blog';
+                    }
                 } else {
-                    refreshCaptcha(); // 失败时刷新验证码
+                    refreshCaptcha();
                     showError(data.error || '入馆通行失败。');
+                    btn.disabled = false;
+                    btn.textContent = '⚜️ 入馆';
                 }
             } catch (err) {
                 showError('红魔馆大门暂时无法连接，请稍后再试。');
+                btn.disabled = false;
+                btn.textContent = '⚜️ 入馆';
             }
         }
 
@@ -233,7 +247,7 @@
             var box = document.getElementById('errorMsg');
             box.textContent = msg;
             box.classList.add('show');
-            setTimeout(function() { box.classList.remove('show'); }, 5000);
+            box.classList.remove('hide');
         }
     </script>
 </body>
