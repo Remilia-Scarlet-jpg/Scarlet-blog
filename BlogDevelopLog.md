@@ -154,7 +154,62 @@ JS 通过 `e.target.closest('.btn-edit-post')` 读取 `dataset` 调用函数。
 | `c9cb8ca` | Dockerfile 改为构建时编译 Java 源码 |
 | `84d5777` | 管理员用户列表 API |
 | `d32db6b` | 开发日志 BlogDevelopLog.md |
-| `90b2f52` | 管理室拒绝页重做（红魔馆主题+3秒自动退回+charset防乱码）+ 登录/注册角色感知跳转 |
+| `90b2f52` | 管理室拒绝页重做 + 登录/注册角色感知跳转 |
+| `9dd8553` | **茶话会聊天系统 + 文章权限开放 + 分类管理** |
+| `e516753` | 数据库增量迁移（老数据库自动建新表） |
+| `3844841` | 修正验证码东方问答字数提示 |
+| `cdea286` | 头像持久化：Base64 存数据库防容器重启丢失 |
+| `fe9f945` | 新注册用户自动加入所有公共茶室 |
+
+---
+
+## 2026-06-14 茶话会 + 文章权限 + 分类管理
+
+### 功能总览
+
+| 功能 | 说明 |
+|------|------|
+| 文章权限开放 | 所有登录用户可创建/编辑文章（编辑限本人或管理员） |
+| 分类 CRUD | 管理员在管理室标签页管理分类 |
+| 茶话会 | 友人系统 + 私人茶室 + 公共茶室 + 实时消息 |
+
+### 数据库新增表
+
+- `friends` — 友人关系（pending/accepted/rejected）
+- `chat_rooms` — 茶室（private/public）
+- `chat_room_members` — 茶室成员
+- `messages` — 消息记录
+
+### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `src/.../model/Friend.java` | 友人模型 |
+| `src/.../model/ChatRoom.java` | 茶室模型 |
+| `src/.../model/Message.java` | 消息模型 |
+| `src/.../dao/FriendDAO.java` | 友人数据访问 |
+| `src/.../dao/ChatDAO.java` | 聊天数据访问 |
+| `WebContent/chat.jsp` | 茶话会主页 |
+| `WebContent/chat_room.jsp` | 茶室消息页 |
+
+### 新增 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST/PUT/DELETE | `/api/friends[/:id]` | 友人 CRUD |
+| GET/POST | `/api/chat/rooms` | 茶室列表/创建 |
+| GET | `/api/chat/rooms/:id` | 茶室详情 |
+| GET | `/api/chat/rooms/:id/messages` | 消息列表（支持 ?since= 增量轮询） |
+| POST | `/api/chat/messages` | 发送消息 |
+| POST/PUT/DELETE | `/api/categories[/:id]` | 分类 CRUD（管理员） |
+
+### 安全/修复
+
+- 头像从文件系统改为 Base64 存数据库（防 Render 容器重启丢失）
+- 验证码东方问答字数提示修正（5 题）
+- 数据库增量迁移机制（新表按需创建，不影响已有数据）
+- 管理室导航链接仅管理员可见
+- 新注册用户自动加入所有公共茶室
 
 ---
 
@@ -162,6 +217,7 @@ JS 通过 `e.target.closest('.btn-edit-post')` 读取 `dataset` 调用函数。
 
 | 项目 | 原因 |
 |------|------|
-| Git 历史含演示账号 | `git filter-branch` 风险较高，个人仓库暂不处理 |
-| Git author 邮箱（假邮箱） | 无需处理 |
-| 验证码升级为图形 CAPTCHA | 当前方案已足够，图形方案需额外依赖 |
+| 茶话会消息搜索/翻页 | 当前 50 条限制，后续可加 |
+| 茶室邀请链接 | 未实现 |
+| 离线消息通知 | 需要 WebSocket，当前 AJAX 轮询够用 |
+| 内容审核 | 小博客暂不需要 |
