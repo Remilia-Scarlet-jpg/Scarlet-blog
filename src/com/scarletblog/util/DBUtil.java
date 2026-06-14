@@ -8,11 +8,11 @@ import java.sql.*;
  */
 public class DBUtil {
 
-    // 数据库连接 — 环境变量注入（无敏感默认值）
-    private static final String DB_HOST = env("DB_HOST", "localhost");
-    private static final String DB_PORT = env("DB_PORT", "3306");
-    private static final String DB_NAME = env("DB_NAME", "scarletblog");
-    private static final String DB_USER = env("DB_USER", "scarletblog");
+    // 数据库连接 — 优先读环境变量，fallback 为 Aiven 默认值（Render 仅注入 DB_PASS）
+    private static final String DB_HOST = env("DB_HOST", "mysql-scarlet-blog-scarlet-blog.e.aivencloud.com");
+    private static final String DB_PORT = env("DB_PORT", "11400");
+    private static final String DB_NAME = env("DB_NAME", "defaultdb");
+    private static final String DB_USER = env("DB_USER", "avnadmin");
     private static final String DB_PASS = env("DB_PASS", "");
 
     private static final String URL =

@@ -1119,6 +1119,13 @@ body {
     .header-inner {
         flex-direction: column;
         text-align: center;
+        gap: 10px;
+    }
+
+    .nav-links {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
     }
 
     .article-full { padding: 20px; }
@@ -1126,14 +1133,172 @@ body {
 
     .hero-section h2 { font-size: 1.5rem; }
 
-    .admin-table { font-size: 0.8rem; }
-    .admin-table th, .admin-table td { padding: 8px 10px; }
+    /* 管理表格水平滚动 */
+    .admin-table {
+        font-size: 0.8rem;
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .admin-table th, .admin-table td { padding: 8px 10px; white-space: nowrap; }
+
+    /* 文章 meta 换行 */
+    .post-card-meta {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .post-card-meta span {
+        font-size: 0.75rem;
+    }
+
+    /* 评论表单项全宽 */
+    .comment-form input,
+    .comment-form textarea {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* 轮播缩小 */
+    .carousel-container {
+        max-height: 220px;
+    }
 }
 
 @media (max-width: 600px) {
-    .nav-links a { padding: 8px 12px; font-size: 0.8rem; }
+    .nav-links a {
+        padding: 6px 10px;
+        font-size: 0.78rem;
+        border-radius: 4px;
+    }
     .post-card-body { padding: 15px; }
     .post-card-title { font-size: 1.1rem; }
-    .modal-dialog { margin: 10px; }
+    .modal-dialog { margin: 10px; max-width: 95vw; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* 页脚缩小 */
+    .scarlet-footer {
+        padding: 25px 15px;
+        font-size: 0.8rem;
+    }
+
+    /* 文章内容区 */
+    .article-content img {
+        max-width: 100%;
+        height: auto;
+    }
+    .article-content table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    /* 评论列表 */
+    .comment-item {
+        padding: 12px;
+    }
+
+    /* 头像裁剪区 */
+    .crop-workspace {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* 轮播 */
+    .carousel-container {
+        max-height: 180px;
+    }
+    .carousel-arrow {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+
+    /* 分页按钮 */
+    .pagination button {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+}
+
+/* 超小屏（手机竖屏） */
+@media (max-width: 400px) {
+    /* 导航只显示文字，隐藏装饰 */
+    .nav-links a {
+        padding: 6px 8px;
+        font-size: 0.72rem;
+        letter-spacing: 0;
+    }
+
+    /* 统计卡片 2 列 */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    .stat-card {
+        padding: 15px 10px;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    /* 认证卡片 */
+    .auth-card {
+        padding: 30px 20px;
+    }
+    .auth-card h2 {
+        font-size: 1.3rem;
+    }
+    .auth-form input {
+        padding: 12px;
+    }
+    .auth-form .btn-scarlet {
+        padding: 12px;
+        font-size: 1rem;
+    }
+
+    /* 文章卡片 */
+    .post-card-title {
+        font-size: 1rem;
+    }
+    .post-card-excerpt {
+        font-size: 0.85rem;
+    }
+
+    /* 管理按钮组 */
+    .admin-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+    .admin-header .btn-scarlet {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* 轮播 */
+    .carousel-container {
+        max-height: 150px;
+        border-radius: 4px;
+    }
+
+    /* 隐藏页脚装饰 */
+    .footer-ornament {
+        font-size: 0.7rem;
+    }
+
+    /* Logo 缩小 */
+    .logo-icon {
+        font-size: 2rem;
+    }
+    .logo-text h1 {
+        font-size: 1.2rem;
+    }
+    .logo-text .subtitle {
+        font-size: 0.65rem;
+    }
+
+    /* Toast 消息 */
+    .toast {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
 }

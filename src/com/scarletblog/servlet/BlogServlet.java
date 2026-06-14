@@ -345,11 +345,11 @@ public class BlogServlet extends HttpServlet {
                 resp.getWriter().write("{\"success\":false,\"error\":\"旧封印密语不正确。\"}");
             }
         }
-        // GET /api/auth/logout — 离馆
+        // GET /api/auth/logout — 离馆（销毁 session 后回大厅）
         else if (path.equals("/api/auth/logout") && method.equals("GET")) {
             HttpSession session = req.getSession(false);
             if (session != null) session.invalidate();
-            resp.getWriter().write("{\"success\":true,\"message\":\"再见，欢迎随时回红魔馆。\"}");
+            resp.sendRedirect(req.getContextPath() + "/blog");
         }
     }
 
@@ -556,12 +556,6 @@ public class BlogServlet extends HttpServlet {
     private void handleHealth(HttpServletRequest req, HttpServletResponse resp)
             throws Exception {
         resp.setContentType("application/json;charset=UTF-8");
-        // 需认证
-        User user = getCurrentUser(req);
-        if (user == null) {
-            resp.getWriter().write("{\"status\":\"error\",\"error\":\"未入馆\"}");
-            return;
-        }
         StringBuilder sb = new StringBuilder("{\"status\":\"ok\"");
         try {
             java.sql.Connection c = com.scarletblog.util.DBUtil.getConnection();
