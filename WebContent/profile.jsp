@@ -397,7 +397,8 @@
             </div>
             <nav class="nav-links">
                 <a href="<%=ctxPath%>/blog">🏠 大厅</a>
-                <a href="<%=ctxPath%>/blog/admin">⚙️ 管理室</a>
+                <% if (currentUser != null && currentUser.isAdmin()) { %><a href="<%=ctxPath%>/blog/admin">⚙️ 管理室</a><% } %>
+                <a href="<%=ctxPath%>/blog/chat" title="茶话会">🍵 茶话会</a>
                 <a href="<%=ctxPath%>/blog/profile" class="active">👤 档案</a>
                 <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light);border:1px solid var(--scarlet);">🚪 离馆</a>
             </nav>

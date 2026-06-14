@@ -37,8 +37,12 @@
             </div>
             <nav class="nav-links">
                 <a href="<%=ctxPath%>/blog" class="active" title="大厅">🏠 大厅</a>
-                <a href="<%=ctxPath%>/blog/admin" title="管理室">⚙️ 管理室</a>
+                <% if (currentUser != null && currentUser.isAdmin()) { %>
+                    <a href="<%=ctxPath%>/blog/admin" title="管理室">⚙️ 管理室</a>
+                <% } %>
                 <% if (currentUser != null) { %>
+                    <a href="<%=ctxPath%>/blog/chat" title="茶话会">🍵 茶话会</a>
+                    <a href="#" onclick="openCreatePostModal();return false;" title="撰写文章">📝 撰写</a>
                     <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? ctxPath + "/" + currentUser.getAvatar() : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
                              style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
@@ -261,5 +265,86 @@
             });
         })();
     </script>
+
+    <% if (currentUser != null) { %>
+    <script src="<%=ctxPath%>/js/blog.js"></script>
+    <%-- 撰写文章模态框 --%>
+    <div class="modal-overlay" id="postModalIndex">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>📝 撰写文章</h3>
+                <button class="modal-close" onclick="closeCreatePostModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="createPostForm" onsubmit="createPost(event)">
+                    <div class="form-group">
+                        <label>📌 标题 *</label>
+                        <input type="text" id="createPostTitle" placeholder="文章标题" maxlength="200" required>
+                    </div>
+                    <div class="form-group">
+                        <label>📂 分类</label>
+                        <select id="createPostCategory">
+                            <option value="">无分类</option>
+                            <% if (categories != null) {
+                                for (com.scarletblog.model.Category c : categories) { %>
+                            <option value="<%=c.getId()%>"><%= HtmlUtil.escape(c.getIcon() != null ? c.getIcon() : "") %> <%= HtmlUtil.escape(c.getName()) %></option>
+                            <%     }
+                               } %>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>🏷️ 标签（逗号分隔）</label>
+                        <input type="text" id="createPostTags" placeholder="例: 东方,红魔馆,Java" maxlength="200">
+                    </div>
+                    <div class="form-group">
+                        <label>📝 内容 *（支持HTML）</label>
+                        <textarea id="createPostContent" placeholder="在这里写下文章内容..." rows="10" required></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-scarlet-outline" onclick="closeCreatePostModal()">取消</button>
+                        <button type="submit" class="btn-scarlet">💾 发布</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        function openCreatePostModal() {
+            document.getElementById('createPostTitle').value = '';
+            document.getElementById('createPostTags').value = '';
+            document.getElementById('createPostContent').value = '';
+            document.getElementById('postModalIndex').classList.add('active');
+        }
+        function closeCreatePostModal() {
+            document.getElementById('postModalIndex').classList.remove('active');
+        }
+        function createPost(e) {
+            e.preventDefault();
+            var params = 'title=' + encodeURIComponent(document.getElementById('createPostTitle').value)
+                + '&category_id=' + (parseInt(document.getElementById('createPostCategory').value) || 0)
+                + '&tags=' + encodeURIComponent(document.getElementById('createPostTags').value)
+                + '&content=' + encodeURIComponent(document.getElementById('createPostContent').value);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '<%=ctxPath%>/api/posts', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function() {
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.success) {
+                        alert(resp.message);
+                        closeCreatePostModal();
+                        location.reload();
+                    } else {
+                        alert(resp.error || '发布失败');
+                    }
+                } catch(e) { alert('操作失败'); }
+            };
+            xhr.send(params);
+        }
+        document.getElementById('postModalIndex').addEventListener('click', function(e) {
+            if (e.target === this) closeCreatePostModal();
+        });
+    </script>
+    <% } %>
 </body>
 </html>

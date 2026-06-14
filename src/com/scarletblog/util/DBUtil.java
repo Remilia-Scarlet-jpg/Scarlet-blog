@@ -121,6 +121,46 @@ public class DBUtil {
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+            stmt.execute("CREATE TABLE friends (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY," +
+                "user_id INT NOT NULL," +
+                "friend_id INT NOT NULL," +
+                "status VARCHAR(20) DEFAULT 'pending'," +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "UNIQUE KEY unique_friendship (user_id, friend_id)," +
+                "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE," +
+                "FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            stmt.execute("CREATE TABLE chat_rooms (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY," +
+                "name VARCHAR(100) NOT NULL," +
+                "type VARCHAR(20) NOT NULL DEFAULT 'private'," +
+                "created_by INT," +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            stmt.execute("CREATE TABLE chat_room_members (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY," +
+                "room_id INT NOT NULL," +
+                "user_id INT NOT NULL," +
+                "joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "UNIQUE KEY unique_membership (room_id, user_id)," +
+                "FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE," +
+                "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            stmt.execute("CREATE TABLE messages (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY," +
+                "room_id INT NOT NULL," +
+                "sender_id INT NOT NULL," +
+                "content TEXT NOT NULL," +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE," +
+                "FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
             // 种子数据 - 分类
             stmt.execute("INSERT INTO categories (name, description, icon) VALUES " +
                 "('幻想乡日记', '记录红魔馆的日常生活', '🏰')," +
@@ -153,6 +193,10 @@ public class DBUtil {
             stmt.execute("INSERT INTO users (username, password, nickname, avatar, role) VALUES " +
                 "('remilia', '" + SecurityUtil.hashPassword("admin123") + "', '蕾米莉亚·斯卡雷特', 'uploads/avatars/remilia.jpg', '馆主')," +
                 "('sakuya', '" + SecurityUtil.hashPassword("maid123") + "', '十六夜 咲夜', NULL, '女仆长')");
+
+            // 种子数据 - 公共茶室（红魔馆大厅）
+            stmt.execute("INSERT INTO chat_rooms (name, type, created_by) VALUES ('红魔馆大厅', 'public', 1)");
+            stmt.execute("INSERT INTO chat_room_members (room_id, user_id) VALUES (1, 1), (1, 2)");
 
         } catch (SQLException e) {
             System.err.println("[DB] ERROR connecting to MySQL: " + e.getMessage());

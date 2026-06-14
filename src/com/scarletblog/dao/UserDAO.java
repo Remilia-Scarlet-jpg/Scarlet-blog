@@ -82,6 +82,22 @@ public class UserDAO {
     }
 
     /**
+     * 按用户名查找用户（不含密码）
+     */
+    public User findByUsername(String username) throws SQLException {
+        String sql = "SELECT id, username, nickname, avatar, role, created_at FROM users WHERE username = ?";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, username);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return mapUser(rs);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return null;
+    }
+
+    /**
      * 查询全部用户（仅管理员）
      */
     public List<User> getAllUsers() throws SQLException {

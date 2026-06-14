@@ -1544,3 +1544,203 @@ a, button, .btn-scarlet, .btn-scarlet-outline {
         font-size: 1.2rem;
     }
 }
+
+/* ============================================
+   管理标签页
+   ============================================ */
+.admin-tabs {
+    display: flex; gap: 0;
+    border-bottom: 2px solid var(--border-dark);
+    margin-bottom: 25px;
+}
+.admin-tab {
+    background: none; border: none;
+    color: var(--text-muted); padding: 12px 28px;
+    cursor: pointer; font-family: var(--font-en);
+    font-size: 0.9rem; letter-spacing: 1px;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: all 0.3s;
+}
+.admin-tab:hover { color: var(--text-light); }
+.admin-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.admin-tab-content { display: none; }
+.admin-tab-content.active { display: block; }
+
+/* ============================================
+   茶话会布局
+   ============================================ */
+.chat-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 25px;
+    min-height: 70vh;
+}
+.chat-sidebar { position: sticky; top: 100px; align-self: start; }
+
+/* 茶室卡片 */
+.room-list { display: flex; flex-direction: column; gap: 12px; }
+.room-card {
+    background: linear-gradient(135deg, #1a0a0a, #0d0505);
+    border: 1px solid var(--border-dark); border-radius: 6px;
+    padding: 18px; cursor: pointer; transition: all 0.3s;
+    display: flex; align-items: center; gap: 14px;
+}
+.room-card:hover {
+    border-color: var(--gold-dark);
+    box-shadow: 0 0 15px rgba(212,175,55,0.15);
+}
+.room-card-icon { font-size: 1.6rem; flex-shrink: 0; }
+.room-card-info { flex: 1; min-width: 0; }
+.room-card-name { color: var(--text-light); font-weight: 600; font-size: 1rem; }
+.room-card-preview {
+    color: var(--text-muted); font-size: 0.8rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 3px;
+}
+.room-card-meta {
+    font-size: 0.75rem; color: var(--text-muted);
+    display: flex; gap: 10px; margin-top: 5px;
+}
+.section-title {
+    color: var(--gold); font-family: var(--font-en);
+    font-size: 0.9rem; letter-spacing: 2px;
+    margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+/* 友人列表 */
+.friend-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px dotted rgba(139,0,0,0.15);
+}
+.friend-item:last-child { border-bottom: none; }
+.friend-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    object-fit: cover; border: 1px solid var(--border-dark);
+    background: var(--scarlet-darkest);
+}
+.friend-name { color: var(--text-light); flex: 1; font-size: 0.9rem; }
+.friend-actions { display: flex; gap: 6px; }
+.friend-actions button {
+    padding: 4px 10px; font-size: 0.7rem; border-radius: 3px;
+    background: none; border: 1px solid var(--border-dark);
+    color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+}
+.friend-actions button:hover { border-color: var(--gold-dark); color: var(--gold); }
+.friend-actions button.btn-accept:hover { border-color: #2ecc71; color: #2ecc71; }
+.friend-actions button.btn-reject:hover { border-color: var(--scarlet-fire); color: var(--scarlet-fire); }
+
+.friend-request-form {
+    display: flex; gap: 8px; margin-top: 12px;
+}
+.friend-request-form input {
+    flex: 1; background: var(--bg-dark);
+    border: 1px solid var(--border-dark); color: var(--text-light);
+    padding: 8px 12px; border-radius: 3px; font-size: 0.85rem;
+}
+.friend-request-form button {
+    padding: 8px 14px; font-size: 0.8rem;
+}
+
+/* 消息列表 */
+.message-list {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 20px; overflow-y: auto; max-height: 60vh;
+    background: rgba(10,0,0,0.3); border-radius: 6px;
+    border: 1px solid var(--border-dark);
+}
+.message-item {
+    display: flex; gap: 10px; max-width: 75%;
+    align-items: flex-start;
+}
+.message-self {
+    align-self: flex-end; flex-direction: row-reverse;
+}
+.message-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    object-fit: cover; border: 1px solid var(--border-dark);
+    flex-shrink: 0;
+}
+.message-body {
+    background: linear-gradient(135deg, #1a0a0a, #120505);
+    border: 1px solid var(--border-dark); border-radius: 8px;
+    padding: 10px 14px;
+}
+.message-self .message-body {
+    background: linear-gradient(135deg, rgba(139,0,0,0.2), rgba(74,0,0,0.3));
+    border-color: rgba(139,0,0,0.3);
+}
+.message-header {
+    display: flex; gap: 12px; align-items: baseline;
+    margin-bottom: 5px;
+}
+.message-sender {
+    color: var(--gold); font-size: 0.8rem; font-weight: 600;
+}
+.message-time {
+    color: var(--text-muted); font-size: 0.7rem;
+}
+.message-content {
+    color: var(--text-light); font-size: 0.9rem;
+    line-height: 1.6; word-break: break-word;
+}
+
+/* 消息输入区 */
+.chat-input-area {
+    display: flex; gap: 12px; margin-top: 15px; align-items: flex-end;
+}
+.chat-input-area textarea {
+    flex: 1; background: var(--bg-dark);
+    border: 1px solid var(--border-dark); color: var(--text-light);
+    padding: 12px 15px; border-radius: 4px; font-family: var(--font-jp);
+    font-size: 0.9rem; resize: none; min-height: 50px;
+    max-height: 120px; transition: border-color 0.3s;
+}
+.chat-input-area textarea:focus {
+    outline: none; border-color: var(--gold-dark);
+    box-shadow: 0 0 12px rgba(212,175,55,0.1);
+}
+.chat-input-area button {
+    padding: 12px 24px; flex-shrink: 0;
+}
+
+/* 茶室头部 */
+.room-header {
+    display: flex; align-items: center; gap: 15px;
+    margin-bottom: 20px; padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-dark);
+}
+.room-header-icon { font-size: 2rem; }
+.room-header-info h2 { color: var(--gold); font-family: var(--font-en); letter-spacing: 2px; font-size: 1.3rem; }
+.room-header-info span { color: var(--text-muted); font-size: 0.8rem; }
+
+/* 成员标签 */
+.room-members { margin-top: 20px; }
+.member-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; background: rgba(139,0,0,0.1);
+    border: 1px solid rgba(139,0,0,0.2); border-radius: 20px;
+    margin: 3px;
+}
+.member-chip img {
+    width: 20px; height: 20px; border-radius: 50%; object-fit: cover;
+}
+.member-chip span { color: var(--text-light); font-size: 0.8rem; }
+
+/* 无数据 */
+.empty-state-sm {
+    text-align: center; padding: 20px;
+    color: var(--text-muted); font-size: 0.85rem;
+}
+
+/* 响应式 */
+@media (max-width: 900px) {
+    .chat-layout { grid-template-columns: 1fr; }
+    .chat-sidebar { position: static; }
+}
+@media (max-width: 600px) {
+    .message-item { max-width: 90%; }
+    .message-list { max-height: 50vh; padding: 12px; }
+    .admin-tab { padding: 10px 16px; font-size: 0.8rem; }
+}

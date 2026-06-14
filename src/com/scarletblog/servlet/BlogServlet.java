@@ -3,10 +3,15 @@ package com.scarletblog.servlet;
 import com.scarletblog.dao.PostDAO;
 import com.scarletblog.dao.CategoryDAO;
 import com.scarletblog.dao.UserDAO;
+import com.scarletblog.dao.FriendDAO;
+import com.scarletblog.dao.ChatDAO;
 import com.scarletblog.model.Post;
 import com.scarletblog.model.Comment;
 import com.scarletblog.model.Category;
 import com.scarletblog.model.User;
+import com.scarletblog.model.Friend;
+import com.scarletblog.model.ChatRoom;
+import com.scarletblog.model.Message;
 
 import com.scarletblog.util.SecurityUtil;
 
@@ -37,6 +42,8 @@ public class BlogServlet extends HttpServlet {
     private PostDAO postDAO = new PostDAO();
     private CategoryDAO categoryDAO = new CategoryDAO();
     private UserDAO userDAO = new UserDAO();
+    private FriendDAO friendDAO = new FriendDAO();
+    private ChatDAO chatDAO = new ChatDAO();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -80,6 +87,12 @@ public class BlogServlet extends HttpServlet {
                 handleHealth(req, resp);
             } else if (path.equals("/api/admin/users")) {
                 handleAdminUsers(req, resp);
+            } else if (path.startsWith("/api/friends")) {
+                handleFriendsAPI(req, resp);
+            } else if (path.startsWith("/api/chat")) {
+                handleChatAPI(req, resp);
+            } else if (path.startsWith("/blog/chat")) {
+                handleChatPage(req, resp);
             } else {
                 req.getRequestDispatcher("/index.jsp").forward(req, resp);
             }
@@ -498,26 +511,46 @@ public class BlogServlet extends HttpServlet {
             }
         }
         else if (path.equals("/api/posts") && method.equals("POST")) {
-            // 创建文章需要管理员权限
-            if (!isAdmin(req)) {
-                resp.getWriter().write("{\"success\":false,\"error\":\"只有馆主或女仆长才能撰写文章。\"}");
+            // 创建文章需要登录
+            User user = getCurrentUser(req);
+            if (user == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆才能撰写文章。\"}");
                 return;
             }
             Post post = new Post();
             post.setTitle(req.getParameter("title"));
             post.setContent(req.getParameter("content"));
-            post.setAuthor(req.getParameter("author"));
+            // 非管理员作者自动设为当前用户昵称
+            String author = req.getParameter("author");
+            if (author == null || author.trim().isEmpty()) {
+                author = user.getNickname();
+            }
+            post.setAuthor(author);
             try { post.setCategoryId(Integer.parseInt(req.getParameter("category_id"))); } catch (Exception e) {}
             post.setTags(req.getParameter("tags"));
             int id = postDAO.createPost(post);
             resp.getWriter().write("{\"success\":true,\"message\":\"文章创建成功！\",\"id\":" + id + "}");
         }
         else if (path.matches("/api/posts/\\d+") && method.equals("PUT")) {
-            if (!isAdmin(req)) {
-                resp.getWriter().write("{\"success\":false,\"error\":\"只有馆主或女仆长才能修改文章。\"}");
+            // 修改文章需要是作者本人或管理员
+            User user = getCurrentUser(req);
+            if (user == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
                 return;
             }
             int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            // 非管理员只能编辑自己的文章
+            if (!user.isAdmin()) {
+                Post existing = postDAO.getPostById(id);
+                if (existing == null) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"文章未找到。\"}");
+                    return;
+                }
+                if (existing.getAuthor() == null || !existing.getAuthor().equals(user.getNickname())) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"你只能编辑自己的文章哦~\"}");
+                    return;
+                }
+            }
             Post post = new Post();
             post.setId(id);
             post.setTitle(req.getParameter("title"));
@@ -575,18 +608,63 @@ public class BlogServlet extends HttpServlet {
     private void handleCategoriesAPI(HttpServletRequest req, HttpServletResponse resp)
             throws Exception {
         resp.setContentType("application/json;charset=UTF-8");
-        List<Category> categories = categoryDAO.getAllCategories();
-        StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":[");
-        for (int i = 0; i < categories.size(); i++) {
-            if (i > 0) sb.append(",");
-            Category c = categories.get(i);
-            sb.append("{\"id\":").append(c.getId())
-              .append(",\"name\":\"").append(escapeJson(c.getName())).append("\"")
-              .append(",\"icon\":\"").append(escapeJson(c.getIcon())).append("\"")
-              .append(",\"post_count\":").append(c.getPostCount()).append("}");
+        String path = req.getRequestURI().substring(req.getContextPath().length());
+        String method = req.getMethod();
+
+        // GET /api/categories — 列表
+        if (method.equals("GET")) {
+            List<Category> categories = categoryDAO.getAllCategories();
+            StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":[");
+            for (int i = 0; i < categories.size(); i++) {
+                if (i > 0) sb.append(",");
+                Category c = categories.get(i);
+                sb.append("{\"id\":").append(c.getId())
+                  .append(",\"name\":\"").append(escapeJson(c.getName())).append("\"")
+                  .append(",\"description\":\"").append(escapeJson(c.getDescription())).append("\"")
+                  .append(",\"icon\":\"").append(escapeJson(c.getIcon())).append("\"")
+                  .append(",\"post_count\":").append(c.getPostCount()).append("}");
+            }
+            sb.append("]}");
+            resp.getWriter().write(sb.toString());
         }
-        sb.append("]}");
-        resp.getWriter().write(sb.toString());
+        // POST /api/categories — 创建（仅管理员）
+        else if (path.equals("/api/categories") && method.equals("POST")) {
+            if (!isAdmin(req)) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主或女仆长可管理分类。\"}");
+                return;
+            }
+            Category c = new Category();
+            c.setName(req.getParameter("name"));
+            c.setDescription(req.getParameter("description"));
+            c.setIcon(req.getParameter("icon"));
+            int id = categoryDAO.createCategory(c);
+            resp.getWriter().write("{\"success\":true,\"message\":\"分类创建成功\",\"id\":" + id + "}");
+        }
+        // PUT /api/categories/:id — 更新（仅管理员）
+        else if (path.matches("/api/categories/\\d+") && method.equals("PUT")) {
+            if (!isAdmin(req)) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主或女仆长可管理分类。\"}");
+                return;
+            }
+            int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            Category c = new Category();
+            c.setId(id);
+            c.setName(req.getParameter("name"));
+            c.setDescription(req.getParameter("description"));
+            c.setIcon(req.getParameter("icon"));
+            boolean ok = categoryDAO.updateCategory(c);
+            resp.getWriter().write("{\"success\":" + ok + ",\"message\":\"分类已更新\"}");
+        }
+        // DELETE /api/categories/:id — 删除（仅管理员）
+        else if (path.matches("/api/categories/\\d+") && method.equals("DELETE")) {
+            if (!isAdmin(req)) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主或女仆长可管理分类。\"}");
+                return;
+            }
+            int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            boolean ok = categoryDAO.deleteCategory(id);
+            resp.getWriter().write("{\"success\":" + ok + ",\"message\":\"分类已删除\"}");
+        }
     }
 
     /** 健康检查 — 仅管理员可访问 */
@@ -646,6 +724,258 @@ public class BlogServlet extends HttpServlet {
             "{\"success\":true,\"data\":{\"posts\":" + posts +
             ",\"comments\":" + comments + ",\"totalViews\":" + views +
             ",\"categories\":" + categoryDAO.getAllCategories().size() + "}}");
+    }
+
+    // ============================================
+    // 茶话会 — 页面
+    // ============================================
+    private void handleChatPage(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        User user = getCurrentUser(req);
+        if (user == null) {
+            resp.sendRedirect(req.getContextPath() + "/blog/login");
+            return;
+        }
+        req.setAttribute("currentUser", user);
+        // 如果路径是 /blog/chat/room?id=N，转发到聊天室页面
+        String path = req.getRequestURI().substring(req.getContextPath().length());
+        if (path.equals("/blog/chat/room")) {
+            req.getRequestDispatcher("/chat_room.jsp").forward(req, resp);
+        } else {
+            req.getRequestDispatcher("/chat.jsp").forward(req, resp);
+        }
+    }
+
+    // ============================================
+    // 茶话会 — 友人 API
+    // ============================================
+    private void handleFriendsAPI(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        resp.setContentType("application/json;charset=UTF-8");
+        User user = getCurrentUser(req);
+        if (user == null) {
+            resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+            return;
+        }
+        String path = req.getRequestURI().substring(req.getContextPath().length());
+        String method = req.getMethod();
+
+        // GET /api/friends — 友人列表 + 邀请函
+        if (method.equals("GET")) {
+            List<Friend> friends = friendDAO.getFriends(user.getId());
+            List<Friend> sent = friendDAO.getPendingSent(user.getId());
+            List<Friend> received = friendDAO.getPendingReceived(user.getId());
+
+            StringBuilder sb = new StringBuilder("{\"success\":true,");
+            sb.append("\"friends\":[").append(friendsToJson(friends, user.getId())).append("],");
+            sb.append("\"sent\":[").append(friendsToJson(sent, user.getId())).append("],");
+            sb.append("\"received\":[").append(friendsToJson(received, user.getId())).append("]}");
+            resp.getWriter().write(sb.toString());
+        }
+        // POST /api/friends — 发送邀请函
+        else if (path.equals("/api/friends") && method.equals("POST")) {
+            String targetUsername = req.getParameter("username");
+            if (targetUsername == null || targetUsername.trim().isEmpty()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请输入对方名札（用户名）。\"}");
+                return;
+            }
+            // 找到目标用户
+            User targetUser = userDAO.findByUsername(targetUsername.trim());
+            if (targetUser == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"未找到此名札的住人。\"}");
+                return;
+            }
+            if (targetUser.getId() == user.getId()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"不能向自己发邀请函哦~\"}");
+                return;
+            }
+            if (friendDAO.friendshipExists(user.getId(), targetUser.getId())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"你们已经是友人，或已有待处理的邀请函。\"}");
+                return;
+            }
+            int id = friendDAO.sendRequest(user.getId(), targetUser.getId());
+            if (id > 0) {
+                resp.getWriter().write("{\"success\":true,\"message\":\"邀请函已送出！\",\"id\":" + id + "}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"发送失败，请稍后再试。\"}");
+            }
+        }
+        // PUT /api/friends/:id — 接受/拒绝
+        else if (path.matches("/api/friends/\\d+") && method.equals("PUT")) {
+            int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            String action = req.getParameter("action");
+            if ("accept".equals(action)) {
+                friendDAO.acceptRequest(id);
+                // 获取双方 ID，自动创建私人茶室
+                Friend f = friendDAO.getById(id);
+                if (f != null) {
+                    chatDAO.createPrivateRoom(f.getUserId(), f.getFriendId());
+                }
+                resp.getWriter().write("{\"success\":true,\"message\":\"友人已添加！茶室已备好。\"}");
+            } else {
+                friendDAO.rejectRequest(id);
+                resp.getWriter().write("{\"success\":true,\"message\":\"邀请函已婉拒。\"}");
+            }
+        }
+        // DELETE /api/friends/:id — 删除友人
+        else if (path.matches("/api/friends/\\d+") && method.equals("DELETE")) {
+            int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            friendDAO.removeFriend(id);
+            resp.getWriter().write("{\"success\":true,\"message\":\"友人已移除。\"}");
+        }
+    }
+
+    // ============================================
+    // 茶话会 — 聊天 API
+    // ============================================
+    private void handleChatAPI(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        resp.setContentType("application/json;charset=UTF-8");
+        User user = getCurrentUser(req);
+        if (user == null) {
+            resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+            return;
+        }
+        String path = req.getRequestURI().substring(req.getContextPath().length());
+        String method = req.getMethod();
+
+        // GET /api/chat/rooms — 茶室列表
+        if (path.equals("/api/chat/rooms") && method.equals("GET")) {
+            List<ChatRoom> rooms = chatDAO.getRoomsForUser(user.getId());
+            StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":[");
+            for (int i = 0; i < rooms.size(); i++) {
+                if (i > 0) sb.append(",");
+                ChatRoom r = rooms.get(i);
+                sb.append("{\"id\":").append(r.getId());
+                sb.append(",\"name\":\"").append(escapeJson(r.getName())).append("\"");
+                sb.append(",\"type\":\"").append(escapeJson(r.getType())).append("\"");
+                sb.append(",\"member_count\":").append(r.getMemberCount());
+                sb.append(",\"last_message\":").append(r.getLastMessage() != null ? "\"" + escapeJson(r.getLastMessage()) + "\"" : "null");
+                if (r.getLastMessageTime() != null) {
+                    sb.append(",\"last_message_time\":\"").append(r.getLastMessageTime().toString()).append("\"");
+                }
+                sb.append("}");
+            }
+            sb.append("]}");
+            resp.getWriter().write(sb.toString());
+        }
+        // POST /api/chat/rooms — 创建公共茶室（仅管理员）
+        else if (path.equals("/api/chat/rooms") && method.equals("POST")) {
+            if (!isAdmin(req)) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主或女仆长可创建公共茶室。\"}");
+                return;
+            }
+            String name = req.getParameter("name");
+            if (name == null || name.trim().isEmpty()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请输入茶室名称。\"}");
+                return;
+            }
+            int roomId = chatDAO.createPublicRoom(name.trim(), user.getId());
+            if (roomId > 0) {
+                // 新注册用户注册时自动加入，此处先加入当前所有用户
+                chatDAO.addAllUsersToRoom(roomId);
+                resp.getWriter().write("{\"success\":true,\"message\":\"公共茶室已创建！\",\"id\":" + roomId + "}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"创建失败。\"}");
+            }
+        }
+        // GET /api/chat/rooms/:id — 茶室详情
+        else if (path.matches("/api/chat/rooms/\\d+") && !path.contains("/messages") && method.equals("GET")) {
+            int roomId = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            if (!chatDAO.isMember(roomId, user.getId())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"你未加入此茶室。\"}");
+                return;
+            }
+            ChatRoom room = chatDAO.getRoomById(roomId);
+            if (room == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"茶室未找到。\"}");
+                return;
+            }
+            StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":{");
+            sb.append("\"id\":").append(room.getId());
+            sb.append(",\"name\":\"").append(escapeJson(room.getName())).append("\"");
+            sb.append(",\"type\":\"").append(escapeJson(room.getType())).append("\"");
+            sb.append(",\"member_count\":").append(room.getMemberCount());
+            sb.append(",\"is_admin\":").append(user.isAdmin());
+            sb.append("}}");
+            resp.getWriter().write(sb.toString());
+        }
+        // GET /api/chat/rooms/:id/messages — 消息列表
+        else if (path.matches("/api/chat/rooms/\\d+/messages") && method.equals("GET")) {
+            int roomId = Integer.parseInt(path.split("/")[4]);
+            if (!chatDAO.isMember(roomId, user.getId())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"你未加入此茶室。\"}");
+                return;
+            }
+            int since = 0;
+            try { since = Integer.parseInt(req.getParameter("since")); } catch (Exception e) {}
+            List<Message> msgs = chatDAO.getMessages(roomId, since, 50);
+            StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":[");
+            for (int i = 0; i < msgs.size(); i++) {
+                if (i > 0) sb.append(",");
+                Message m = msgs.get(i);
+                sb.append("{\"id\":").append(m.getId());
+                sb.append(",\"sender_id\":").append(m.getSenderId());
+                sb.append(",\"content\":\"").append(escapeJson(m.getContent())).append("\"");
+                sb.append(",\"sender_nickname\":\"").append(escapeJson(m.getSenderNickname())).append("\"");
+                sb.append(",\"sender_avatar\":").append(m.getSenderAvatar() != null ? "\"" + escapeJson(m.getSenderAvatar()) + "\"" : "null");
+                sb.append(",\"created_at\":\"").append(m.getCreatedAt()).append("\"}");
+            }
+            sb.append("]}");
+            resp.getWriter().write(sb.toString());
+        }
+        // POST /api/chat/messages — 发送消息
+        else if (path.equals("/api/chat/messages") && method.equals("POST")) {
+            int roomId;
+            try { roomId = Integer.parseInt(req.getParameter("room_id")); } catch (Exception e) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"缺少茶室 ID。\"}");
+                return;
+            }
+            String content = req.getParameter("content");
+            if (content == null || content.trim().isEmpty()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"消息不能为空。\"}");
+                return;
+            }
+            if (!chatDAO.isMember(roomId, user.getId())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"你未加入此茶室。\"}");
+                return;
+            }
+            int msgId = chatDAO.sendMessage(roomId, user.getId(), content.trim());
+            if (msgId > 0) {
+                resp.getWriter().write("{\"success\":true,\"id\":" + msgId + ",\"created_at\":\"" + new java.util.Date() + "\"}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"发送失败。\"}");
+            }
+        }
+    }
+
+    /** 友人列表 JSON 辅助方法 */
+    private String friendsToJson(List<Friend> list, int currentUserId) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) sb.append(",");
+            Friend f = list.get(i);
+            // 对于双向查询，确定展示的友人信息
+            String displayName, displayAvatar, displayUsername;
+            if (f.getUserId() == currentUserId) {
+                displayUsername = f.getFriendUsername();
+                displayName = f.getFriendNickname();
+                displayAvatar = f.getFriendAvatar();
+            } else {
+                displayUsername = f.getFriendUsername() != null ? f.getFriendUsername() : "";
+                displayName = f.getFriendNickname() != null ? f.getFriendNickname() : "";
+                displayAvatar = f.getFriendAvatar();
+            }
+            sb.append("{\"id\":").append(f.getId());
+            sb.append(",\"user_id\":").append(f.getUserId());
+            sb.append(",\"friend_id\":").append(f.getFriendId());
+            sb.append(",\"status\":\"").append(escapeJson(f.getStatus())).append("\"");
+            sb.append(",\"username\":\"").append(escapeJson(displayUsername != null ? displayUsername : "")).append("\"");
+            sb.append(",\"nickname\":\"").append(escapeJson(displayName != null ? displayName : "")).append("\"");
+            sb.append(",\"avatar\":").append(displayAvatar != null ? "\"" + escapeJson(displayAvatar) + "\"" : "null");
+            sb.append("}");
+        }
+        return sb.toString();
     }
 
     // ============================================

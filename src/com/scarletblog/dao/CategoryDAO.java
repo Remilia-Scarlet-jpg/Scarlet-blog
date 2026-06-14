@@ -64,4 +64,48 @@ public class CategoryDAO {
         } finally { DBUtil.close(conn, pstmt, rs); }
         return 0;
     }
+
+    /** 创建分类 */
+    public int createCategory(Category c) throws SQLException {
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(
+                "INSERT INTO categories (name, description, icon) VALUES (?, ?, ?)",
+                Statement.RETURN_GENERATED_KEYS);
+            pstmt.setString(1, c.getName());
+            pstmt.setString(2, c.getDescription());
+            pstmt.setString(3, c.getIcon() != null ? c.getIcon() : "📜");
+            pstmt.executeUpdate();
+            rs = pstmt.getGeneratedKeys();
+            if (rs.next()) return rs.getInt(1);
+            return -1;
+        } finally { DBUtil.close(conn, pstmt, rs); }
+    }
+
+    /** 更新分类 */
+    public boolean updateCategory(Category c) throws SQLException {
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(
+                "UPDATE categories SET name = ?, description = ?, icon = ? WHERE id = ?");
+            pstmt.setString(1, c.getName());
+            pstmt.setString(2, c.getDescription());
+            pstmt.setString(3, c.getIcon() != null ? c.getIcon() : "📜");
+            pstmt.setInt(4, c.getId());
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, null); }
+    }
+
+    /** 删除分类（文章 category_id 外键 SET NULL，安全删除） */
+    public boolean deleteCategory(int id) throws SQLException {
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement("DELETE FROM categories WHERE id = ?");
+            pstmt.setInt(1, id);
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, null); }
+    }
 }
