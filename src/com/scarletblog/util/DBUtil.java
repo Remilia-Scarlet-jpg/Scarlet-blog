@@ -8,11 +8,11 @@ import java.sql.*;
  */
 public class DBUtil {
 
-    // 数据库连接 — 优先从环境变量读取（Render 部署用），fallback 为 Aiven 默认值
-    private static final String DB_HOST = env("DB_HOST", "mysql-scarlet-blog-scarlet-blog.e.aivencloud.com");
-    private static final String DB_PORT = env("DB_PORT", "11400");
-    private static final String DB_NAME = env("DB_NAME", "defaultdb");
-    private static final String DB_USER = env("DB_USER", "avnadmin");
+    // 数据库连接 — 环境变量注入（无敏感默认值）
+    private static final String DB_HOST = env("DB_HOST", "localhost");
+    private static final String DB_PORT = env("DB_PORT", "3306");
+    private static final String DB_NAME = env("DB_NAME", "scarletblog");
+    private static final String DB_USER = env("DB_USER", "scarletblog");
     private static final String DB_PASS = env("DB_PASS", "");
 
     private static final String URL =
@@ -37,6 +37,10 @@ public class DBUtil {
 
     static {
         try {
+            if (DB_PASS == null || DB_PASS.isEmpty()) {
+                System.err.println("[DB] FATAL: DB_PASS 环境变量未设置！请在 Render Dashboard 或本地环境中配置数据库密码。");
+                throw new RuntimeException("DB_PASS 环境变量必须设置");
+            }
             Class.forName("com.mysql.cj.jdbc.Driver");
             initDatabase();
         } catch (Exception e) {

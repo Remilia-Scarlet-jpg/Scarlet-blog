@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="java.util.List, com.scarletblog.model.Post, com.scarletblog.model.Category, com.scarletblog.model.User" %>
+<%@ page import="com.scarletblog.util.HtmlUtil" %>
 <%
     List<Post> posts = (List<Post>) request.getAttribute("posts");
     List<Category> categories = (List<Category>) request.getAttribute("categories");
@@ -41,7 +42,7 @@
                     <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? ctxPath + "/" + currentUser.getAvatar() : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
                              style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
-                        <%= currentUser.getNickname() %>
+                        <%= HtmlUtil.escape(currentUser.getNickname()) %>
                     </a>
                     <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light)">🚪 离馆</a>
                 <% } else { %>
@@ -93,14 +94,14 @@
                 <article class="post-card">
                     <div class="post-card-body">
                         <div class="post-card-meta">
-                            <span class="post-card-category"><%= p.getCategoryIcon() != null ? p.getCategoryIcon() : "📜" %> <%= p.getCategoryName() != null ? p.getCategoryName() : "未分类" %></span>
+                            <span class="post-card-category"><%= HtmlUtil.escape(p.getCategoryIcon() != null ? p.getCategoryIcon() : "📜") %> <%= HtmlUtil.escape(p.getCategoryName() != null ? p.getCategoryName() : "未分类") %></span>
                             <span>🕐 <%= p.getCreatedAt() != null ? new java.text.SimpleDateFormat("yyyy年MM月dd日").format(p.getCreatedAt()) : "" %></span>
-                            <span>✍️ <%= p.getAuthor() != null ? p.getAuthor() : "红魔馆之主" %></span>
+                            <span>✍️ <%= HtmlUtil.escape(p.getAuthor() != null ? p.getAuthor() : "红魔馆之主") %></span>
                         </div>
                         <h2 class="post-card-title">
-                            <a href="<%=ctxPath%>/blog/post?id=<%=p.getId()%>"><%= p.getTitle() %></a>
+                            <a href="<%=ctxPath%>/blog/post?id=<%=p.getId()%>"><%= HtmlUtil.escape(p.getTitle()) %></a>
                         </h2>
-                        <p class="post-card-excerpt"><%= excerpt %></p>
+                        <p class="post-card-excerpt"><%= HtmlUtil.escape(excerpt) %></p>
                         <div class="post-card-footer">
                             <div class="post-card-stats">
                                 <span>👁️ <%= p.getViewCount() %></span>
@@ -108,7 +109,7 @@
                             <div class="post-card-tags">
                                 <% if (p.getTags() != null && !p.getTags().isEmpty()) {
                                     for (String tag : p.getTags().split(",")) { %>
-                                        <a href="?search=<%= tag.trim() %>" class="post-card-tag">🏷️ <%= tag.trim() %></a>
+                                        <a href="?search=<%= java.net.URLEncoder.encode(tag.trim(), "UTF-8") %>" class="post-card-tag">🏷️ <%= HtmlUtil.escape(tag.trim()) %></a>
                                 <%  }
                                    } %>
                             </div>
@@ -151,8 +152,8 @@
                 <div class="scarlet-card-header">🔍 搜索</div>
                 <div class="scarlet-card-body">
                     <form class="search-box" action="<%=ctxPath%>/blog" method="get">
-                        <input type="text" name="search" placeholder="输入关键词..." value="<%= search != null ? search : "" %>">
-                        <% if (currentCategory != null) { %><input type="hidden" name="category" value="<%=currentCategory%>"><% } %>
+                        <input type="text" name="search" placeholder="输入关键词..." value="<%= search != null ? HtmlUtil.escape(search) : "" %>">
+                        <% if (currentCategory != null) { %><input type="hidden" name="category" value="<%=HtmlUtil.escape(currentCategory)%>"><% } %>
                         <button type="submit">搜索</button>
                     </form>
                 </div>
@@ -166,7 +167,7 @@
                         <% if (categories != null) {
                             for (Category c : categories) { %>
                         <li><a href="<%=ctxPath%>/blog?category=<%= java.net.URLEncoder.encode(c.getName(), "UTF-8") %>">
-                            <%= c.getIcon() != null ? c.getIcon() : "📜" %> <%= c.getName() %>
+                            <%= HtmlUtil.escape(c.getIcon() != null ? c.getIcon() : "📜") %> <%= HtmlUtil.escape(c.getName()) %>
                             <span style="color:var(--text-muted);font-size:0.8rem;">(<%=c.getPostCount()%>)</span>
                         </a></li>
                         <%     }

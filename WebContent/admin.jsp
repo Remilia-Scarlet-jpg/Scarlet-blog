@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="java.util.List, com.scarletblog.model.Post, com.scarletblog.model.Category, com.scarletblog.model.User" %>
+<%@ page import="com.scarletblog.util.HtmlUtil" %>
 <%
     List<Post> posts = (List<Post>) request.getAttribute("posts");
     List<Category> categories = (List<Category>) request.getAttribute("categories");
@@ -36,8 +37,8 @@
                     <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? ctxPath + "/" + currentUser.getAvatar() : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
                              style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
-                        <span style="color:var(--gold);font-size:0.85rem;"><%= currentUser.getNickname() %></span>
-                        <span style="color:var(--text-muted);font-size:0.7rem;">(<%= currentUser.getRole() %>)</span>
+                        <span style="color:var(--gold);font-size:0.85rem;"><%= HtmlUtil.escape(currentUser.getNickname()) %></span>
+                        <span style="color:var(--text-muted);font-size:0.7rem;">(<%= HtmlUtil.escape(currentUser.getRole()) %>)</span>
                     </a>
                     <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light);border:1px solid var(--scarlet);">🚪 离馆</a>
                 <% } else { %>
@@ -101,16 +102,26 @@
                         %>
                         <tr>
                             <td><%= p.getId() %></td>
-                            <td><strong><%= p.getTitle() %></strong></td>
-                            <td><%= p.getAuthor() != null ? p.getAuthor() : "-" %></td>
-                            <td><%= catIcon %> <%= catName %></td>
+                            <td><strong><%= HtmlUtil.escape(p.getTitle()) %></strong></td>
+                            <td><%= HtmlUtil.escape(p.getAuthor() != null ? p.getAuthor() : "-") %></td>
+                            <td><%= HtmlUtil.escape(catIcon) %> <%= HtmlUtil.escape(catName) %></td>
                             <td><%= p.getViewCount() %></td>
                             <td><%= p.getIsPublished() == 1 ? "✅ 公开" : "📝 草稿" %></td>
                             <td><%= p.getUpdatedAt() != null ? sdf.format(p.getUpdatedAt()) : "-" %></td>
                             <td>
                                 <div class="actions" style="display:flex;gap:6px;">
-                                    <button class="btn-scarlet-outline" onclick="editPost(<%=p.getId()%>, '<%= p.getTitle().replace("'", "\\'") %>', '<%= p.getContent() != null ? p.getContent().replace("'", "\\'").replace("\n", "\\n") : "" %>', '<%= p.getAuthor() != null ? p.getAuthor() : "红魔馆之主" %>', <%= p.getCategoryId() %>, '<%= p.getTags() != null ? p.getTags() : "" %>', <%= p.getIsPublished() %>)" style="padding:5px 10px;font-size:0.8rem;">✏️</button>
-                                    <button class="btn-scarlet-outline btn-danger" onclick="deletePost(<%=p.getId()%>)" style="padding:5px 10px;font-size:0.8rem;">🗑️</button>
+                                    <button class="btn-scarlet-outline btn-edit-post"
+                                        data-id="<%=p.getId()%>"
+                                        data-title="<%= HtmlUtil.escape(p.getTitle()) %>"
+                                        data-content="<%= HtmlUtil.escape(p.getContent() != null ? p.getContent() : "") %>"
+                                        data-author="<%= HtmlUtil.escape(p.getAuthor() != null ? p.getAuthor() : "红魔馆之主") %>"
+                                        data-category="<%= p.getCategoryId() %>"
+                                        data-tags="<%= HtmlUtil.escape(p.getTags() != null ? p.getTags() : "") %>"
+                                        data-published="<%= p.getIsPublished() %>"
+                                        style="padding:5px 10px;font-size:0.8rem;">✏️</button>
+                                    <button class="btn-scarlet-outline btn-danger btn-delete-post"
+                                        data-id="<%=p.getId()%>"
+                                        style="padding:5px 10px;font-size:0.8rem;">🗑️</button>
                                 </div>
                             </td>
                         </tr>
@@ -148,7 +159,7 @@
                             <option value="">无分类</option>
                             <% if (categories != null) {
                                 for (Category c : categories) { %>
-                            <option value="<%=c.getId()%>"><%= c.getIcon() != null ? c.getIcon() : "" %> <%= c.getName() %></option>
+                            <option value="<%=c.getId()%>"><%= HtmlUtil.escape(c.getIcon() != null ? c.getIcon() : "") %> <%= HtmlUtil.escape(c.getName()) %></option>
                             <%     }
                                } %>
                         </select>
@@ -297,6 +308,32 @@
         }
 
         // Close modal on overlay click
+        document.getElementById('postModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // 事件委托：编辑 / 删除按钮
+        document.querySelector('.admin-table tbody').addEventListener('click', function(e) {
+            var editBtn = e.target.closest('.btn-edit-post');
+            if (editBtn) {
+                editPost(
+                    parseInt(editBtn.dataset.id),
+                    editBtn.dataset.title,
+                    editBtn.dataset.content,
+                    editBtn.dataset.author,
+                    parseInt(editBtn.dataset.category) || 0,
+                    editBtn.dataset.tags,
+                    parseInt(editBtn.dataset.published)
+                );
+                return;
+            }
+            var delBtn = e.target.closest('.btn-delete-post');
+            if (delBtn) {
+                deletePost(parseInt(delBtn.dataset.id));
+            }
+        });
+
+        // 点击模态框外部关闭
         document.getElementById('postModal').addEventListener('click', function(e) {
             if (e.target === this) closeModal();
         });

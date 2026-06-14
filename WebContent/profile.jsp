@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="com.scarletblog.model.User" %>
+<%@ page import="com.scarletblog.util.HtmlUtil" %>
 <%
     User currentUser = (User) request.getAttribute("currentUser");
     String ctxPath = request.getContextPath();
@@ -449,8 +450,8 @@
                     </div>
                     <button class="btn-avatar-upload" onclick="document.getElementById('avatarFileInput').click()">🖼️ 更换头像</button>
                     <input type="file" class="hidden-file-input" id="avatarFileInput" accept="image/jpeg,image/png,image/gif,image/webp" onchange="onAvatarFileSelected(event)">
-                    <div class="profile-name"><%= currentUser.getNickname() %></div>
-                    <span class="profile-role"><%= currentUser.getRole() %></span>
+                    <div class="profile-name"><%= HtmlUtil.escape(currentUser.getNickname()) %></div>
+                    <span class="profile-role"><%= HtmlUtil.escape(currentUser.getRole()) %></span>
                 </div>
 
                 <div class="profile-tabs">
@@ -463,15 +464,15 @@
                 <div class="profile-panel active" id="panel-info">
                     <div class="profile-info-item">
                         <span class="profile-info-label">📛 名札</span>
-                        <span class="profile-info-value"><%= currentUser.getUsername() %></span>
+                        <span class="profile-info-value"><%= HtmlUtil.escape(currentUser.getUsername()) %></span>
                     </div>
                     <div class="profile-info-item">
                         <span class="profile-info-label">🎭 称呼</span>
-                        <span class="profile-info-value"><%= currentUser.getNickname() %></span>
+                        <span class="profile-info-value"><%= HtmlUtil.escape(currentUser.getNickname()) %></span>
                     </div>
                     <div class="profile-info-item">
                         <span class="profile-info-label">⚜️ 身份</span>
-                        <span class="profile-info-value"><%= currentUser.getRole() %></span>
+                        <span class="profile-info-value"><%= HtmlUtil.escape(currentUser.getRole()) %></span>
                     </div>
                     <div class="profile-info-item">
                         <span class="profile-info-label">📅 入馆日期</span>
@@ -480,7 +481,7 @@
                     <div class="profile-stats">
                         <div class="profile-stat">
                             <div class="profile-stat-value"><%= currentUser.getRole().equals("馆主") || currentUser.getRole().equals("女仆长") ? "👑" : "🏠" %></div>
-                            <div class="profile-stat-label"><%= currentUser.getRole() %></div>
+                            <div class="profile-stat-label"><%= HtmlUtil.escape(currentUser.getRole()) %></div>
                         </div>
                         <div class="profile-stat">
                             <div class="profile-stat-value">📅</div>
@@ -498,15 +499,15 @@
                     <form onsubmit="saveProfile(event)">
                         <div class="form-group">
                             <label>📛 名札（不可修改）</label>
-                            <input type="text" value="<%= currentUser.getUsername() %>" readonly>
+                            <input type="text" value="<%= HtmlUtil.escape(currentUser.getUsername()) %>" readonly>
                         </div>
                         <div class="form-group">
                             <label>🎭 称呼</label>
-                            <input type="text" id="editNickname" value="<%= currentUser.getNickname() %>" placeholder="输入你的称呼" maxlength="50">
+                            <input type="text" id="editNickname" value="<%= HtmlUtil.escape(currentUser.getNickname()) %>" placeholder="输入你的称呼" maxlength="50">
                         </div>
                         <div class="form-group">
                             <label>⚜️ 身份</label>
-                            <input type="text" value="<%= currentUser.getRole() %>" readonly>
+                            <input type="text" value="<%= HtmlUtil.escape(currentUser.getRole()) %>" readonly>
                         </div>
                         <div class="form-actions">
                             <button type="submit" class="btn-scarlet" id="btnSaveProfile">💾 保存资料</button>

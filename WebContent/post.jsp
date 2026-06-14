@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="com.scarletblog.model.Post, com.scarletblog.model.Comment, com.scarletblog.model.User, java.util.List, java.text.SimpleDateFormat" %>
+<%@ page import="com.scarletblog.util.HtmlUtil" %>
 <%
     Post post = (Post) request.getAttribute("post");
     List<Comment> comments = (List<Comment>) request.getAttribute("comments");
@@ -12,7 +13,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= post != null ? post.getTitle() + " - " : "" %>红魔馆博客</title>
+    <title><%= post != null ? HtmlUtil.escape(post.getTitle()) + " - " : "" %>红魔馆博客</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E🏰%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="<%=ctxPath%>/css/scarlet.css">
 </head>
@@ -33,7 +34,7 @@
                     <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? ctxPath + "/" + currentUser.getAvatar() : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
                              style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
-                        <%= currentUser.getNickname() %>
+                        <%= HtmlUtil.escape(currentUser.getNickname()) %>
                     </a>
                     <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light)">🚪 离馆</a>
                 <% } else { %>
@@ -49,18 +50,18 @@
             <article class="article-full">
                 <div class="post-card-meta" style="margin-bottom:20px;">
                     <span class="post-card-category">
-                        <%= post.getCategoryIcon() != null ? post.getCategoryIcon() : "📜" %>
-                        <%= post.getCategoryName() != null ? post.getCategoryName() : "未分类" %>
+                        <%= HtmlUtil.escape(post.getCategoryIcon() != null ? post.getCategoryIcon() : "📜") %>
+                        <%= HtmlUtil.escape(post.getCategoryName() != null ? post.getCategoryName() : "未分类") %>
                     </span>
                     <span>🕐 <%= post.getCreatedAt() != null ? sdf.format(post.getCreatedAt()) : "" %></span>
-                    <span>✍️ <%= post.getAuthor() != null ? post.getAuthor() : "红魔馆之主" %></span>
+                    <span>✍️ <%= HtmlUtil.escape(post.getAuthor() != null ? post.getAuthor() : "红魔馆之主") %></span>
                     <span>👁️ <%= post.getViewCount() %> 次阅读</span>
                 </div>
-                <h1><%= post.getTitle() %></h1>
+                <h1><%= HtmlUtil.escape(post.getTitle()) %></h1>
                 <% if (post.getTags() != null && !post.getTags().isEmpty()) { %>
                 <div class="post-card-tags" style="margin-bottom:20px;">
                     <% for (String tag : post.getTags().split(",")) { %>
-                        <span class="post-card-tag">🏷️ <%= tag.trim() %></span>
+                        <span class="post-card-tag">🏷️ <%= HtmlUtil.escape(tag.trim()) %></span>
                     <% } %>
                 </div>
                 <% } %>
@@ -76,9 +77,9 @@
                 <% if (comments != null && !comments.isEmpty()) {
                     for (Comment c : comments) { %>
                 <div class="comment-item">
-                    <div class="comment-author">👤 <%= c.getAuthor() != null ? c.getAuthor() : "匿名访客" %></div>
+                    <div class="comment-author">👤 <%= HtmlUtil.escape(c.getAuthor() != null ? c.getAuthor() : "匿名访客") %></div>
                     <div class="comment-date">🕐 <%= c.getCreatedAt() != null ? sdf.format(c.getCreatedAt()) : "" %></div>
-                    <div class="comment-content"><%= c.getContent() %></div>
+                    <div class="comment-content"><%= HtmlUtil.escape(c.getContent()) %></div>
                 </div>
                 <%     }
                    } else { %>

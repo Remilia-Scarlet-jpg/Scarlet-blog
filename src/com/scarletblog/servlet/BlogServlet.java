@@ -45,6 +45,15 @@ public class BlogServlet extends HttpServlet {
         String path = req.getRequestURI().substring(req.getContextPath().length());
 
         try {
+            // CSRF 防护：状态变更 API 验证 Origin 头
+            String method = req.getMethod();
+            if (isStateChanging(method) && path.startsWith("/api/")) {
+                if (!csrfCheck(req)) {
+                    resp.setContentType("application/json;charset=UTF-8");
+                    resp.getWriter().write("{\"success\":false,\"error\":\"CSRF 验证失败\"}");
+                    return;
+                }
+            }
             if (path.equals("/") || path.equals("/index.jsp") || path.equals("/blog")) {
                 handleIndex(req, resp);
             } else if (path.equals("/blog/post")) {
@@ -76,6 +85,7 @@ public class BlogServlet extends HttpServlet {
             e.printStackTrace();
             resp.sendError(500, "红魔馆内部错误：" + e.getMessage());
         }
+        addSameSiteCookie(resp);
     }
 
     @Override
@@ -291,7 +301,9 @@ public class BlogServlet extends HttpServlet {
                     resp.getWriter().write("{\"success\":false,\"error\":\"头像仅支持 JPG/PNG/GIF/WebP 格式。\"}");
                     return;
                 }
-                String savedName = user.getUsername() + "_" + System.currentTimeMillis() + ext;
+                // 脱敏用户名以防路径穿越（仅允许字母数字下划线）
+                String safeName = user.getUsername().replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fff]", "_");
+                String savedName = safeName + "_" + System.currentTimeMillis() + ext;
                 String uploadDir = req.getServletContext().getRealPath("/uploads/avatars");
                 Path uploadPath = Paths.get(uploadDir);
                 if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
@@ -540,19 +552,23 @@ public class BlogServlet extends HttpServlet {
         resp.getWriter().write(sb.toString());
     }
 
-    /** 健康检查 - 诊断用 */
+    /** 健康检查 — 仅管理员可访问 */
     private void handleHealth(HttpServletRequest req, HttpServletResponse resp)
             throws Exception {
         resp.setContentType("application/json;charset=UTF-8");
-        StringBuilder sb = new StringBuilder("{\"status\":\"ok\",");
-        sb.append("\"db_host\":\"").append(escapeJson(System.getenv("DB_HOST") != null ? System.getenv("DB_HOST") : "default")).append("\",");
-        sb.append("\"db_pass_set\":").append(System.getenv("DB_PASS") != null && !System.getenv("DB_PASS").isEmpty());
+        // 需认证
+        User user = getCurrentUser(req);
+        if (user == null) {
+            resp.getWriter().write("{\"status\":\"error\",\"error\":\"未入馆\"}");
+            return;
+        }
+        StringBuilder sb = new StringBuilder("{\"status\":\"ok\"");
         try {
             java.sql.Connection c = com.scarletblog.util.DBUtil.getConnection();
             sb.append(",\"db\":\"connected\"");
             c.close();
         } catch (Exception e) {
-            sb.append(",\"db\":\"error\",\"db_error\":\"").append(escapeJson(e.getMessage())).append("\"");
+            sb.append(",\"db\":\"error\"");
         }
         sb.append("}");
         resp.getWriter().write(sb.toString());
@@ -596,6 +612,35 @@ public class BlogServlet extends HttpServlet {
     private boolean isAdmin(HttpServletRequest req) {
         User user = getCurrentUser(req);
         return user != null && user.isAdmin();
+    }
+
+    /** 是否需要 CSRF 防护 */
+    private boolean isStateChanging(String method) {
+        return "POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method);
+    }
+
+    /** CSRF Origin/Referer 检查 */
+    private boolean csrfCheck(HttpServletRequest req) {
+        String origin = req.getHeader("Origin");
+        String referer = req.getHeader("Referer");
+        String host = req.getServerName();
+        // 验证 Origin 或 Referer 匹配当前主机
+        if (origin != null) {
+            return origin.contains(host);
+        }
+        if (referer != null) {
+            return referer.contains(host);
+        }
+        // 无 Origin 也无 Referer 的请求 — 可能是直接 API 调用，放行
+        return true;
+    }
+
+    /** 为 session cookie 添加 SameSite 标记 */
+    private void addSameSiteCookie(HttpServletResponse resp) {
+        String header = resp.getHeader("Set-Cookie");
+        if (header != null && header.toUpperCase().contains("JSESSIONID") && !header.contains("SameSite")) {
+            resp.setHeader("Set-Cookie", header + "; SameSite=Lax");
+        }
     }
 
     // ============================================

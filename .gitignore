@@ -3,3 +3,4 @@
 .settings/
 auth_migration.sql
 *.zip
+bin/

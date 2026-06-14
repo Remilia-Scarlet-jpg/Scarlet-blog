@@ -1,4 +1,4 @@
 src/
-.auth_migration.sql
+auth_migration.sql
 *.zip
 *.md
