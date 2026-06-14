@@ -154,6 +154,7 @@ JS 通过 `e.target.closest('.btn-edit-post')` 读取 `dataset` 调用函数。
 | `c9cb8ca` | Dockerfile 改为构建时编译 Java 源码 |
 | `84d5777` | 管理员用户列表 API |
 | `d32db6b` | 开发日志 BlogDevelopLog.md |
+| `90b2f52` | 管理室拒绝页重做（红魔馆主题+3秒自动退回+charset防乱码）+ 登录/注册角色感知跳转 |
 
 ---
 
