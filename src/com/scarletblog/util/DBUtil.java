@@ -72,12 +72,13 @@ public class DBUtil {
              Statement stmt = conn.createStatement()) {
             System.out.println("[DB] Connected successfully!");
 
-            // 检查是否已有表
+            // 检查是否已有表（仅新部署时全部建表）
             ResultSet rs = stmt.executeQuery("SHOW TABLES LIKE 'posts'");
-            if (rs.next()) { rs.close(); return; }
+            boolean isNew = !rs.next();
             rs.close();
 
-            // 创建表
+            if (isNew) {
+            // ===== 全新部署：建所有表 + 种子数据 =====
             stmt.execute("CREATE TABLE categories (" +
                 "id INT AUTO_INCREMENT PRIMARY KEY," +
                 "name VARCHAR(50) NOT NULL UNIQUE," +
@@ -197,6 +198,79 @@ public class DBUtil {
             // 种子数据 - 公共茶室（红魔馆大厅）
             stmt.execute("INSERT INTO chat_rooms (name, type, created_by) VALUES ('红魔馆大厅', 'public', 1)");
             stmt.execute("INSERT INTO chat_room_members (room_id, user_id) VALUES (1, 1), (1, 2)");
+
+            } // end if (isNew)
+            // ===== 增量迁移：已有数据库补充新表 =====
+            else {
+                rs = stmt.executeQuery("SHOW TABLES LIKE 'friends'");
+                if (!rs.next()) {
+                    System.out.println("[DB] Creating incremental table: friends");
+                    stmt.execute("CREATE TABLE friends (" +
+                        "id INT AUTO_INCREMENT PRIMARY KEY," +
+                        "user_id INT NOT NULL," +
+                        "friend_id INT NOT NULL," +
+                        "status VARCHAR(20) DEFAULT 'pending'," +
+                        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                        "UNIQUE KEY unique_friendship (user_id, friend_id)," +
+                        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE," +
+                        "FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                }
+                rs.close();
+
+                rs = stmt.executeQuery("SHOW TABLES LIKE 'chat_rooms'");
+                if (!rs.next()) {
+                    System.out.println("[DB] Creating incremental table: chat_rooms");
+                    stmt.execute("CREATE TABLE chat_rooms (" +
+                        "id INT AUTO_INCREMENT PRIMARY KEY," +
+                        "name VARCHAR(100) NOT NULL," +
+                        "type VARCHAR(20) NOT NULL DEFAULT 'private'," +
+                        "created_by INT," +
+                        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                        "FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                }
+                rs.close();
+
+                rs = stmt.executeQuery("SHOW TABLES LIKE 'chat_room_members'");
+                if (!rs.next()) {
+                    System.out.println("[DB] Creating incremental table: chat_room_members");
+                    stmt.execute("CREATE TABLE chat_room_members (" +
+                        "id INT AUTO_INCREMENT PRIMARY KEY," +
+                        "room_id INT NOT NULL," +
+                        "user_id INT NOT NULL," +
+                        "joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                        "UNIQUE KEY unique_membership (room_id, user_id)," +
+                        "FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE," +
+                        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                }
+                rs.close();
+
+                rs = stmt.executeQuery("SHOW TABLES LIKE 'messages'");
+                if (!rs.next()) {
+                    System.out.println("[DB] Creating incremental table: messages");
+                    stmt.execute("CREATE TABLE messages (" +
+                        "id INT AUTO_INCREMENT PRIMARY KEY," +
+                        "room_id INT NOT NULL," +
+                        "sender_id INT NOT NULL," +
+                        "content TEXT NOT NULL," +
+                        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                        "FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE," +
+                        "FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                }
+                rs.close();
+
+                // 检查是否需要种子公共茶室
+                rs = stmt.executeQuery("SELECT COUNT(*) FROM chat_rooms WHERE type = 'public'");
+                rs.next();
+                if (rs.getInt(1) == 0) {
+                    System.out.println("[DB] Seeding public chat room: 红魔馆大厅");
+                    stmt.execute("INSERT INTO chat_rooms (name, type, created_by) VALUES ('红魔馆大厅', 'public', 1)");
+                    stmt.execute("INSERT INTO chat_room_members (room_id, user_id) VALUES (1, 1), (1, 2)");
+                }
+            }
 
         } catch (SQLException e) {
             System.err.println("[DB] ERROR connecting to MySQL: " + e.getMessage());
