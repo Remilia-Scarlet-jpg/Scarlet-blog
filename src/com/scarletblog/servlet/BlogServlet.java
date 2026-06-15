@@ -793,6 +793,14 @@ public class BlogServlet extends HttpServlet {
                 resp.getWriter().write("{\"success\":false,\"error\":\"你们已经是友人，或已有待处理的邀请函。\"}");
                 return;
             }
+            // 冷却检查：同一用户 60 秒内只能发一次邀请
+            int cooldown = friendDAO.getSecondsSinceLastRequest(user.getId());
+            if (cooldown >= 0 && cooldown < 60) {
+                int remain = 60 - cooldown;
+                resp.getWriter().write("{\"success\":false,\"error\":\"请勿频繁发送邀请函，"
+                    + remain + "秒后再试。\"}");
+                return;
+            }
             int id = friendDAO.sendRequest(user.getId(), targetUser.getId());
             if (id > 0) {
                 resp.getWriter().write("{\"success\":true,\"message\":\"邀请函已送出！\",\"id\":" + id + "}");
@@ -803,7 +811,17 @@ public class BlogServlet extends HttpServlet {
         // PUT /api/friends/:id — 接受/拒绝
         else if (path.matches("/api/friends/\\d+") && method.equals("PUT")) {
             int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
-            String action = req.getParameter("action");
+            // PUT 请求体 Servlet 不会自动解析，手动读取
+            String action = null;
+            try {
+                String body = new java.util.Scanner(req.getInputStream(), "UTF-8").useDelimiter("\\A").next();
+                for (String pair : body.split("&")) {
+                    String[] kv = pair.split("=", 2);
+                    if (kv.length == 2 && "action".equals(java.net.URLDecoder.decode(kv[0], "UTF-8"))) {
+                        action = java.net.URLDecoder.decode(kv[1], "UTF-8");
+                    }
+                }
+            } catch (java.util.NoSuchElementException e) { /* empty body */ }
             if ("accept".equals(action)) {
                 friendDAO.acceptRequest(id);
                 // 获取双方 ID，自动创建私人茶室（失败不影响接受结果）

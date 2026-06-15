@@ -19,7 +19,7 @@ public class FriendDAO {
             "FROM friends f JOIN users u ON u.id = f.friend_id " +
             "WHERE f.user_id = ? AND f.status = 'accepted' " +
             "UNION " +
-            "SELECT f.id, f.user_id, f.friend_id, f.status, f.created_at, " +
+            "SELECT f.id, f.friend_id AS user_id, f.user_id AS friend_id, f.status, f.created_at, " +
             "u.username AS f_username, u.nickname AS f_nickname, u.avatar AS f_avatar " +
             "FROM friends f JOIN users u ON u.id = f.user_id " +
             "WHERE f.friend_id = ? AND f.status = 'accepted' " +
@@ -66,6 +66,27 @@ public class FriendDAO {
         return list;
     }
 
+    /** 获取最后一次发邀请函距今的秒数（无记录返回-1） */
+    public int getSecondsSinceLastRequest(int userId) throws SQLException {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(
+                "SELECT TIMESTAMPDIFF(SECOND, MAX(created_at), NOW()) FROM friends WHERE user_id = ?");
+            pstmt.setInt(1, userId);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                int sec = rs.getInt(1);
+                return rs.wasNull() ? -1 : sec;
+            }
+            return -1;
+        } finally {
+            DBUtil.close(conn, pstmt, rs);
+        }
+    }
+
     /** 发送邀请函 */
     public int sendRequest(int fromUserId, int toUserId) throws SQLException {
         Connection conn = null;
@@ -73,7 +94,8 @@ public class FriendDAO {
         try {
             conn = DBUtil.getConnection();
             pstmt = conn.prepareStatement(
-                "INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, 'pending')",
+                "INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, 'pending') " +
+                "ON DUPLICATE KEY UPDATE status = 'pending', created_at = CURRENT_TIMESTAMP",
                 Statement.RETURN_GENERATED_KEYS);
             pstmt.setInt(1, fromUserId);
             pstmt.setInt(2, toUserId);
