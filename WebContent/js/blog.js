@@ -67,7 +67,7 @@ function createPostCard(post) {
                     <span>✍️ ${post.author}</span>
                 </div>
                 <h2 class="post-card-title">
-                    <a href="post?id=${post.id}">${post.title}</a>
+                    <a href="${typeof CTX_PATH !== 'undefined' ? CTX_PATH : ''}/blog/post?id=${post.id}">${post.title}</a>
                 </h2>
                 <p class="post-card-excerpt">${truncate(post.excerpt || post.content, 200)}</p>
                 <div class="post-card-footer">
