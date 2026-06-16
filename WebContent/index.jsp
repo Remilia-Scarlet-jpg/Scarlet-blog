@@ -130,7 +130,7 @@
             </div>
 
             <%-- 分页 --%>
-            <div class="pagination">
+            <div class="pagination" id="pagination">
                 <% if (totalPages > 1) {
                     String queryStr = (search != null ? "&search=" + java.net.URLEncoder.encode(search, "UTF-8") : "")
                         + (currentCategory != null ? "&category=" + java.net.URLEncoder.encode(currentCategory, "UTF-8") : "");
@@ -156,7 +156,7 @@
                 <div class="scarlet-card-header">🔍 搜索</div>
                 <div class="scarlet-card-body">
                     <form class="search-box" action="<%=ctxPath%>/blog" method="get">
-                        <input type="text" name="search" placeholder="输入关键词..." value="<%= search != null ? HtmlUtil.escape(search) : "" %>">
+                        <input type="text" name="search" id="searchInput" placeholder="输入关键词..." value="<%= search != null ? HtmlUtil.escape(search) : "" %>">
                         <% if (currentCategory != null) { %><input type="hidden" name="category" value="<%=HtmlUtil.escape(currentCategory)%>"><% } %>
                         <button type="submit">搜索</button>
                     </form>
@@ -166,7 +166,7 @@
             <div class="scarlet-card">
                 <div class="scarlet-card-header">📂 分类</div>
                 <div class="scarlet-card-body">
-                    <ul>
+                    <ul id="categoryList">
                         <li><a href="<%=ctxPath%>/blog">📜 全部文章</a></li>
                         <% if (categories != null) {
                             for (Category c : categories) { %>
@@ -182,7 +182,7 @@
 
             <div class="scarlet-card">
                 <div class="scarlet-card-header">📊 红魔馆统计</div>
-                <div class="scarlet-card-body">
+                <div class="scarlet-card-body" id="statsBox">
                     <p>📝 文章: <strong style="color:var(--gold)"><%= totalPosts != null ? totalPosts : 0 %></strong></p>
                     <p>💬 评论: <strong style="color:var(--gold)"><%= totalComments != null ? totalComments : 0 %></strong></p>
                     <p>👁️ 浏览: <strong style="color:var(--gold)"><%= totalViews != null ? totalViews : 0 %></strong></p>
@@ -267,6 +267,8 @@
     </script>
 
     <% if (currentUser != null) { %>
+    <script>var CTX_PATH = '<%=ctxPath%>';</script>
+    <script src="<%=ctxPath%>/js/api.js"></script>
     <script src="<%=ctxPath%>/js/blog.js"></script>
     <%-- 撰写文章模态框 --%>
     <div class="modal-overlay" id="postModalIndex">

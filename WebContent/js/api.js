@@ -3,7 +3,14 @@
 // すべてのAPIリクエストをここで管理
 // ============================================
 
-const API_BASE = '/api';
+// 自动检测 context path（兼容 /myblog、/ 等不同部署路径）
+var CTX_PATH = typeof CTX_PATH !== 'undefined' ? CTX_PATH : (function() {
+    var p = window.location.pathname;
+    // 从 /<ctx>/blog/... 或 /<ctx>/post 等路径中提取 context path
+    var m = p.match(/^(\/[^/]+)\/(?:blog|post|admin|chat|profile|login|register)/);
+    return m ? m[1] : '';
+})();
+const API_BASE = CTX_PATH + '/api';
 
 const ScarletAPI = {
     /**
