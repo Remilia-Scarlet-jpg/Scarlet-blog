@@ -268,8 +268,8 @@
 
     <% if (currentUser != null) { %>
     <script>var CTX_PATH = '<%=ctxPath%>';</script>
-    <script src="<%=ctxPath%>/js/api.js"></script>
-    <script src="<%=ctxPath%>/js/blog.js"></script>
+    <script src="<%=ctxPath%>/js/api.js?v=20260616"></script>
+    <script src="<%=ctxPath%>/js/blog.js?v=20260616"></script>
     <%-- 撰写文章模态框 --%>
     <div class="modal-overlay" id="postModalIndex">
         <div class="modal-dialog">
