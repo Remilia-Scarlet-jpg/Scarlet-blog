@@ -1,8 +1,62 @@
 # 红魔馆博客 — 开发日志
 
-## 2026-06-16 登录态首页空白 + 文章链接 404 + 双目录隔离
+## 2026-06-16 个人主页 + 轮播图动态化 + 视频支持
 
-### 一、登录后首页文章不显示
+### 一、住人公开主页（B 站风格）
+
+**新增**：`/blog/user?id=N` 公开个人主页，点击茶话会头像/消息即可访问。
+
+**功能**：
+- 大号头像 + 昵称 + 身份徽章 + 入馆日期 + 三列统计（文章/友人/评论）
+- 看别人：好友按钮（发送邀请/接受/婉拒/移除友人/进入茶室）
+- 看自己：头像裁剪上传 + 编辑称呼 + 修改密码（三 Tab 面板）
+- 最近 5 篇文章列表
+- 整合原 `/blog/profile`，自动 302 重定向
+
+**新增文件**：`user.jsp`，`UserDAO.findById/getPostCount/getCommentCount`，`PostDAO.getPostsByAuthor/getPostCountByAuthor`，`FriendDAO.getFriendCount/getRelationshipBetween`
+
+**修改文件**：`chat.jsp`、`chat_room.jsp`（头像/昵称可点击），`api.js`（+users 端点），所有 JSP 导航栏加「我的主页」入口
+
+### 二、轮播图动态化 + 视频播放
+
+**从硬编码 3 张图升级为数据库驱动**：
+- 新建 `carousel_slides` 表（type/image_path/video_url/title/sort_order）
+- 全新文件：`CarouselSlide.java` 模型 + `CarouselDAO.java`（完整 CRUD + 排序）
+- 管理室「🖼️ 轮播图」Tab：添加/编辑/删除/上移下移
+- 支持图片（本地上传）+ 视频（本地上传 MP4/WebM 或外链 URL）
+- 首页动态渲染，切幻灯片自动暂停/播放视频
+- 仅 1 张幻灯片时停止自动轮播
+
+### 三、BUG 修复
+
+| 问题 | 修复 |
+|------|------|
+| `toPostJsonRaw` 缺 `created_at` → JS NaN | 补充 created_at / updated_at 字段 |
+| 登录后首页文章不显示 | api.js 未加载 + API_BASE 硬编码 + DOM 缺 id（3 层 bug） |
+| 新建文章后 404 | blog.js 链接相对路径 → 改为 CTX_PATH 绝对路径 |
+| MySQL 8 Public Key Retrieval | 本地版 JDBC URL 加 `allowPublicKeyRetrieval=true` |
+| 浏览器缓存旧 JS | 加 `?v=20260616` 版本号 |
+
+### 四、双目录修改规则
+
+本地 `myblog-src` 和云端 `myblog-render` 分维护规则写入记忆文件。
+
+---
+
+## 提交记录
+
+| commit | 内容 |
+|--------|------|
+| `c9e1abe` | fix: 登录后首页文章无法加载 |
+| `47b6284` | fix: blog.js 文章链接绝对路径 |
+| `ce3891a` | chore: JS 版本号强制刷新缓存 |
+| `01513ad` | docs: 2026-06-16 开发日志 + 文档 |
+
+> 注意：个人主页 + 轮播图重构目前仅本地版 (`myblog-src`)，未推送云端。
+
+---
+
+## 2026-06-14 安全加固 + 体验优化
 
 **问题**：未登录可正常浏览文章，登录后首页显示「加载文章失败... 请检查服务器和数据库连接」。
 
