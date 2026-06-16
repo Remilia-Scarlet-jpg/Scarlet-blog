@@ -1,5 +1,65 @@
 # 红魔馆博客 — 开发日志
 
+## 2026-06-16 登录态首页空白 + 文章链接 404 + 双目录隔离
+
+### 一、登录后首页文章不显示
+
+**问题**：未登录可正常浏览文章，登录后首页显示「加载文章失败... 请检查服务器和数据库连接」。
+
+**根因**（三层 bug）：
+1. `index.jsp` 未加载 `api.js`——`blog.js` 依赖 `ScarletAPI` 对象，但定义它的 `api.js` 从未被引入
+2. `api.js` 中 `API_BASE` 硬编码为 `/api`，未考虑 context path `/myblog`
+3. `index.jsp` 侧栏 DOM 元素只有 `class` 没有 `id`（`pagination` / `searchInput` / `categoryList` / `statsBox`），`blog.js` 的 `getElementById()` 返回 `null` 后设 `.innerHTML` 抛 TypeError
+
+**修改**：
+- `index.jsp` — 新增 `<script>var CTX_PATH...</script>` + 加载 `api.js`，补充 4 个 DOM id
+- `api.js` — `API_BASE` 改为自动检测 context path（兼容 `/myblog` / `/` 等部署路径）
+- `blog.js` — 文章链接从相对路径 `post?id=` 改为 `CTX_PATH + '/blog/post?id='`
+
+### 二、新建文章后打开报 404
+
+**问题**：点击新建的文章链接跳转到 `/myblog/post?id=X`，Tomcat 返回 404「请求的资源不可用」。
+
+**根因**：`blog.js` 的文章链接用了相对路径 `href="post?id=${post.id}"`。浏览器将当前页 `/myblog/blog` 解析为目录 `/myblog/`，相对路径 `post?id=X` 被解析为 `/myblog/post?id=X`，缺少 `/blog` 前缀。
+
+**修改**：`blog.js` 链接改为基于 `CTX_PATH` 的绝对路径。
+
+### 三、本地 MySQL 8 Public Key Retrieval 错误
+
+**问题**：本地 Tomcat 启动后所有页面报「红魔馆大门暂时无法连接」。
+
+**根因**：MySQL 8 默认 `caching_sha2_password` 认证，JDBC 非 SSL 连接不允许获取公钥。
+
+**修改**：`DBUtil.java`（本地版 only）JDBC URL 增加 `&allowPublicKeyRetrieval=true`。
+
+### 四、双目录修改规则制定
+
+**背景**：本地开发目录 `myblog-src` 和云端部署目录 `myblog-render` 共存的场景下，将本地 `DBUtil.java` 误 cp 到云端目录，险些用 localhost 配置覆盖 Aiven 生产配置。
+
+**措施**：
+- 制定白名单：JSP / JS / CSS / DAO / Servlet / Model 可安全 cp，`DBUtil.java` / `Dockerfile` / SQL 严禁 cp
+- 规则写入项目记忆文件 `scarlet_blog.md`，后续会话自动加载
+- JS 文件加 `?v=20260616` 版本号，避免浏览器缓存导致修复未生效
+
+### 五、JS 版本号缓存策略
+
+**问题**：修复部署后浏览器仍使用缓存旧 JS，用户持续看到 404。
+
+**修改**：`index.jsp` 的 `<script src>` 加 `?v=20260616` 查询参数强制浏览器重新下载。
+
+---
+
+## 提交记录
+
+| commit | 内容 |
+|--------|------|
+| ... | ...（见上文） |
+| `c9e1abe` | **fix: 修复登录后首页文章无法加载** — api.js 加载 + CTX_PATH + 4 个 DOM id |
+| `47b6284` | **fix: blog.js 文章链接绝对路径** — 修复新建文章后 404 |
+| `ce3891a` | **chore: JS 版本号强制刷新缓存** |
+
+---
+
 ## 2026-06-14 安全加固 + 体验优化
 
 ### 一、注册流程修复

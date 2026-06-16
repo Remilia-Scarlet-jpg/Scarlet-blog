@@ -101,10 +101,12 @@ GET    /api/admin/users       用户列表（管理员）
 - Tomcat 9
 - MySQL 8
 
+> ⚠️ **MySQL 8 注意**：本地 JDBC 连接可能需要 `allowPublicKeyRetrieval=true`。详见 `src/.../util/DBUtil.java`（本地版 fallback 为 `localhost:3306`，`sslMode=DISABLED`）。
+
 ### 步骤
 ```bash
 # 1. 创建数据库
-mysql -u root -p -e "CREATE DATABASE scarlet_blog"
+mysql -u root -p -e "CREATE DATABASE scarlet_blog CHARACTER SET utf8mb4"
 
 # 2. 设置环境变量
 export DB_HOST=localhost
@@ -113,15 +115,16 @@ export DB_NAME=scarlet_blog
 export DB_USER=root
 export DB_PASS=your_password
 
-# 3. 编译
+# 3. 编译（Eclipse 项目，输出到 bin/）
 javac -encoding UTF-8 \
-  -cp servlet-api.jar:mysql-connector-j-9.3.0.jar:tomcat-jdbc.jar \
-  -d WebContent/WEB-INF/classes \
+  -cp "servlet-api.jar;mysql-connector-j-9.3.0.jar;tomcat-jdbc.jar" \
+  -d bin \
   $(find src -name "*.java")
 
-# 4. 部署到 Tomcat webapps/
+# 4. 部署到 Tomcat
+cp -r WebContent/* bin/com/ $TOMCAT_HOME/webapps/myblog/
 
-# 5. 启动 Tomcat，访问 http://localhost:8080/<app>/
+# 5. 启动 Tomcat，访问 http://localhost:8080/myblog/blog
 ```
 
 首次启动自动建表 + 插入种子数据（6 篇东方主题文章 + 8 条评论 + 5 个分类）。
