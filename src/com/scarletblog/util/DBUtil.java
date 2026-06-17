@@ -362,7 +362,6 @@ public class DBUtil {
                         "('image', 'images/slide_1.jpg', '红魔馆', 1)," +
                         "('image', 'images/slide_2.jpg', '红魔馆', 2)," +
                         "('image', 'images/slide_3.jpg', '红魔馆', 3)");
-                }
                 } else {
                     // 增量迁移：添加 poster 列
                     try {
