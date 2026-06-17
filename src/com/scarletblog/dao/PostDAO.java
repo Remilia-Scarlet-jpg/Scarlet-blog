@@ -84,6 +84,42 @@ public class PostDAO {
         return 0;
     }
 
+    /** 获取指定作者的文章列表（用于个人主页） */
+    public List<Post> getPostsByAuthor(String author, int page, int limit) throws SQLException {
+        List<Post> posts = new ArrayList<>();
+        int offset = (page - 1) * limit;
+        String sql = "SELECT p.*, c.name AS category_name, c.icon AS category_icon " +
+                     "FROM posts p LEFT JOIN categories c ON p.category_id = c.id " +
+                     "WHERE p.is_published = 1 AND p.author = ? " +
+                     "ORDER BY p.created_at DESC LIMIT ? OFFSET ?";
+
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, author);
+            pstmt.setInt(2, limit);
+            pstmt.setInt(3, offset);
+            rs = pstmt.executeQuery();
+            while (rs.next()) posts.add(mapPost(rs));
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return posts;
+    }
+
+    /** 获取指定作者的文章总数 */
+    public int getPostCountByAuthor(String author) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM posts WHERE is_published = 1 AND author = ?";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, author);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return 0;
+    }
+
     /** 获取单篇文章 */
     public Post getPostById(int id) throws SQLException {
         Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;

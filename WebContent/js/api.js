@@ -143,6 +143,15 @@ const ScarletAPI = {
         get() {
             return ScarletAPI.get('/stats');
         }
+    },
+
+    // ============================================
+    // ユーザー API
+    // ============================================
+    users: {
+        get(id) {
+            return ScarletAPI.get('/users/' + id);
+        }
     }
 };
 

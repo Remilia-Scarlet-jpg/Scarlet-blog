@@ -163,10 +163,12 @@
             var div = document.createElement('div');
             div.className = 'message-item' + (isSelf ? ' message-self' : '');
             div.innerHTML =
-                '<img class="message-avatar" src="' + avatar + '" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%234a0000%22/%3E%3C/svg%3E\'">' +
+                '<a href="' + ctxPath + '/blog/user?id=' + m.sender_id + '" title="查看档案" style="text-decoration:none;color:inherit;">' +
+                    '<img class="message-avatar" src="' + avatar + '" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%234a0000%22/%3E%3C/svg%3E\'">' +
+                '</a>' +
                 '<div class="message-body">' +
                 '<div class="message-header">' +
-                '<span class="message-sender">' + escHtml(m.sender_nickname) + '</span>' +
+                '<a href="' + ctxPath + '/blog/user?id=' + m.sender_id + '" class="message-sender" style="text-decoration:none;color:inherit;cursor:pointer;">' + escHtml(m.sender_nickname) + '</a>' +
                 '<span class="message-time">' + time + '</span>' +
                 '</div>' +
                 '<div class="message-content">' + escHtml(m.content) + '</div>' +

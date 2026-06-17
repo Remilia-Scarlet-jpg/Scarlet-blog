@@ -5,6 +5,7 @@ import com.scarletblog.dao.CategoryDAO;
 import com.scarletblog.dao.UserDAO;
 import com.scarletblog.dao.FriendDAO;
 import com.scarletblog.dao.ChatDAO;
+import com.scarletblog.dao.CarouselDAO;
 import com.scarletblog.model.Post;
 import com.scarletblog.model.Comment;
 import com.scarletblog.model.Category;
@@ -12,6 +13,7 @@ import com.scarletblog.model.User;
 import com.scarletblog.model.Friend;
 import com.scarletblog.model.ChatRoom;
 import com.scarletblog.model.Message;
+import com.scarletblog.model.CarouselSlide;
 
 import com.scarletblog.util.SecurityUtil;
 
@@ -44,6 +46,7 @@ public class BlogServlet extends HttpServlet {
     private UserDAO userDAO = new UserDAO();
     private FriendDAO friendDAO = new FriendDAO();
     private ChatDAO chatDAO = new ChatDAO();
+    private CarouselDAO carouselDAO = new CarouselDAO();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -73,6 +76,8 @@ public class BlogServlet extends HttpServlet {
                 handleRegisterPage(req, resp);
             } else if (path.equals("/blog/profile")) {
                 handleProfilePage(req, resp);
+            } else if (path.equals("/blog/user")) {
+                handleUserPage(req, resp);
             } else if (path.startsWith("/api/auth")) {
                 handleAuthAPI(req, resp);
             } else if (path.startsWith("/api/posts")) {
@@ -87,6 +92,10 @@ public class BlogServlet extends HttpServlet {
                 handleHealth(req, resp);
             } else if (path.equals("/api/admin/users")) {
                 handleAdminUsers(req, resp);
+            } else if (path.startsWith("/api/admin/carousel")) {
+                handleCarouselAPI(req, resp);
+            } else if (path.startsWith("/api/users")) {
+                handleUsersAPI(req, resp);
             } else if (path.startsWith("/api/friends")) {
                 handleFriendsAPI(req, resp);
             } else if (path.startsWith("/api/chat")) {
@@ -161,13 +170,75 @@ public class BlogServlet extends HttpServlet {
     // ============================================
     private void handleProfilePage(HttpServletRequest req, HttpServletResponse resp)
             throws Exception {
+        // 已整合到 user.jsp，重定向到新公开主页
         User user = getCurrentUser(req);
         if (user == null) {
             resp.sendRedirect(req.getContextPath() + "/blog/login");
             return;
         }
-        req.setAttribute("currentUser", user);
-        req.getRequestDispatcher("/profile.jsp").forward(req, resp);
+        resp.sendRedirect(req.getContextPath() + "/blog/user?id=" + user.getId());
+    }
+
+    // ============================================
+    // 住人公开主页（B 站风格个人主页）
+    // ============================================
+    private void handleUserPage(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        User currentUser = getCurrentUser(req);
+        if (currentUser == null) {
+            resp.sendRedirect(req.getContextPath() + "/blog/login");
+            return;
+        }
+        String idStr = req.getParameter("id");
+        if (idStr == null || idStr.trim().isEmpty()) {
+            resp.sendRedirect(req.getContextPath() + "/blog");
+            return;
+        }
+        int targetUserId = Integer.parseInt(idStr.trim());
+        User profileUser = userDAO.findById(targetUserId);
+        if (profileUser == null) {
+            resp.sendRedirect(req.getContextPath() + "/blog");
+            return;
+        }
+
+        // 加载统计数据
+        int postCount = userDAO.getPostCount(targetUserId);
+        int commentCount = userDAO.getCommentCount(targetUserId);
+        int friendCount = friendDAO.getFriendCount(targetUserId);
+
+        // 判断关系状态
+        String relationship = "none";
+        int friendshipId = 0;
+        if (currentUser.getId() == targetUserId) {
+            relationship = "self";
+        } else {
+            Friend rel = friendDAO.getRelationshipBetween(currentUser.getId(), targetUserId);
+            if (rel == null) {
+                relationship = "none";
+            } else if ("accepted".equals(rel.getStatus())) {
+                relationship = "friend";
+                friendshipId = rel.getId();
+            } else if (rel.getUserId() == currentUser.getId()) {
+                relationship = "pending_sent";
+                friendshipId = rel.getId();
+            } else {
+                relationship = "pending_received";
+                friendshipId = rel.getId();
+            }
+        }
+
+        // 加载最近文章
+        List<Post> recentPosts = postDAO.getPostsByAuthor(profileUser.getNickname(), 1, 5);
+
+        req.setAttribute("currentUser", currentUser);
+        req.setAttribute("profileUser", profileUser);
+        req.setAttribute("postCount", postCount);
+        req.setAttribute("commentCount", commentCount);
+        req.setAttribute("friendCount", friendCount);
+        req.setAttribute("relationship", relationship);
+        req.setAttribute("friendshipId", friendshipId);
+        req.setAttribute("recentPosts", recentPosts);
+        req.getRequestDispatcher("/user.jsp").forward(req, resp);
     }
 
     // ============================================
@@ -402,6 +473,9 @@ public class BlogServlet extends HttpServlet {
 
         // 传递当前访客信息到页面
         req.setAttribute("currentUser", getCurrentUser(req));
+
+        // 轮播图幻灯片（数据库驱动）
+        req.setAttribute("slides", carouselDAO.getAllSlides());
 
         req.getRequestDispatcher("/index.jsp").forward(req, resp);
     }
@@ -713,6 +787,181 @@ public class BlogServlet extends HttpServlet {
         resp.getWriter().write(sb.toString());
     }
 
+    /** REST API - 轮播图管理（管理员） */
+    private void handleCarouselAPI(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        resp.setContentType("application/json;charset=UTF-8");
+        User currentUser = getCurrentUser(req);
+        if (currentUser == null || !currentUser.isAdmin()) {
+            resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主或女仆长可管理轮播图。\"}");
+            return;
+        }
+        String path = req.getRequestURI().substring(req.getContextPath().length());
+        String method = req.getMethod();
+
+        // GET /api/admin/carousel — 所有幻灯片
+        if (path.equals("/api/admin/carousel") && "GET".equals(method)) {
+            List<CarouselSlide> slides = carouselDAO.getAllSlidesAdmin();
+            StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":[");
+            for (int i = 0; i < slides.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(toCarouselJson(slides.get(i), req.getContextPath()));
+            }
+            sb.append("]}");
+            resp.getWriter().write(sb.toString());
+            return;
+        }
+
+        // POST /api/admin/carousel — 新增幻灯片
+        if (path.equals("/api/admin/carousel") && "POST".equals(method)) {
+            String type = req.getParameter("type");
+            if (type == null) type = "image";
+            String title = req.getParameter("title");
+            String videoUrl = req.getParameter("video_url");
+
+            String imagePath = null;
+            if ("image".equals(type)) {
+                Part filePart = null;
+                try { filePart = req.getPart("image"); } catch (Exception e) {}
+                if (filePart == null || filePart.getSize() == 0) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"请选择图片文件。\"}");
+                    return;
+                }
+                if (filePart.getSize() > 5 * 1024 * 1024) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"图片不能超过 5MB。\"}");
+                    return;
+                }
+                String fname = getSubmittedFileName(filePart);
+                String ext = fname.contains(".") ? fname.substring(fname.lastIndexOf(".")).toLowerCase() : ".jpg";
+                if (!ext.matches("\\.(jpg|jpeg|png|gif|webp)$")) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"仅支持 JPG/PNG/GIF/WebP 格式。\"}");
+                    return;
+                }
+                // 先创建记录获取 ID
+                CarouselSlide s = new CarouselSlide();
+                s.setType("image"); s.setTitle(title); s.setImagePath("");
+                int id = carouselDAO.create(s);
+                // 用 ID 命名文件
+                imagePath = "images/carousel_" + id + ext;
+                Path target = Paths.get(req.getServletContext().getRealPath("/"), imagePath);
+                Files.copy(filePart.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                // 更新路径
+                s.setId(id); s.setImagePath(imagePath);
+                carouselDAO.update(s);
+                resp.getWriter().write("{\"success\":true,\"message\":\"幻灯片已添加！\",\"data\":" + toCarouselJson(carouselDAO.getById(id), req.getContextPath()) + "}");
+                return;
+            } else if ("video".equals(type)) {
+                if (videoUrl == null || videoUrl.trim().isEmpty()) {
+                    // 检查是否有本地视频文件上传
+                    Part videoPart = null;
+                    try { videoPart = req.getPart("video_file"); } catch (Exception e) {}
+                    if (videoPart == null || videoPart.getSize() == 0) {
+                        resp.getWriter().write("{\"success\":false,\"error\":\"请上传视频文件或输入视频 URL。\"}");
+                        return;
+                    }
+                    // 本地视频文件上传
+                    String vname = getSubmittedFileName(videoPart);
+                    String vext = vname.contains(".") ? vname.substring(vname.lastIndexOf(".")).toLowerCase() : ".mp4";
+                    if (!vext.matches("\\.(mp4|webm)$")) {
+                        resp.getWriter().write("{\"success\":false,\"error\":\"视频仅支持 MP4/WebM 格式。\"}");
+                        return;
+                    }
+                    CarouselSlide s = new CarouselSlide();
+                    s.setType("video"); s.setTitle(title); s.setImagePath("");
+                    int id = carouselDAO.create(s);
+                    String vpath = "images/carousel_video_" + id + vext;
+                    Files.copy(videoPart.getInputStream(), Paths.get(req.getServletContext().getRealPath("/"), vpath), StandardCopyOption.REPLACE_EXISTING);
+                    s.setId(id); s.setImagePath(vpath); // 本地视频路径存在 image_path 字段
+                    carouselDAO.update(s);
+                    resp.getWriter().write("{\"success\":true,\"message\":\"本地视频已添加！\",\"data\":" + toCarouselJson(carouselDAO.getById(id), req.getContextPath()) + "}");
+                    return;
+                }
+                CarouselSlide s = new CarouselSlide();
+                s.setType("video"); s.setTitle(title); s.setVideoUrl(videoUrl.trim());
+                int id = carouselDAO.create(s);
+                resp.getWriter().write("{\"success\":true,\"message\":\"视频幻灯片已添加！\",\"data\":" + toCarouselJson(carouselDAO.getById(id), req.getContextPath()) + "}");
+                return;
+            }
+            resp.getWriter().write("{\"success\":false,\"error\":\"未知类型。\"}");
+            return;
+        }
+
+        // PUT /api/admin/carousel/:id — 更新幻灯片
+        if (path.matches("/api/admin/carousel/\\d+") && "PUT".equals(method)) {
+            int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            CarouselSlide s = carouselDAO.getById(id);
+            if (s == null) { resp.getWriter().write("{\"success\":false,\"error\":\"幻灯片不存在。\"}"); return; }
+
+            String title = req.getParameter("title");
+            String videoUrl = req.getParameter("video_url");
+            if (title != null) s.setTitle(title);
+            if (videoUrl != null) s.setVideoUrl(videoUrl);
+
+            // 替换图片
+            Part filePart = null;
+            try { filePart = req.getPart("image"); } catch (Exception e) {}
+            if (filePart != null && filePart.getSize() > 0) {
+                if (filePart.getSize() > 5 * 1024 * 1024) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"图片不能超过 5MB。\"}"); return;
+                }
+                String fname = getSubmittedFileName(filePart);
+                String ext = fname.contains(".") ? fname.substring(fname.lastIndexOf(".")).toLowerCase() : ".jpg";
+                if (s.getImagePath() != null) {
+                    new java.io.File(req.getServletContext().getRealPath("/"), s.getImagePath()).delete();
+                }
+                String newPath = "images/carousel_" + id + ext;
+                Files.copy(filePart.getInputStream(), Paths.get(req.getServletContext().getRealPath("/"), newPath), StandardCopyOption.REPLACE_EXISTING);
+                s.setImagePath(newPath);
+                s.setVideoUrl(null);
+            }
+
+            // 替换本地视频文件
+            Part videoPart = null;
+            try { videoPart = req.getPart("video_file"); } catch (Exception e) {}
+            if (videoPart != null && videoPart.getSize() > 0) {
+                if (videoPart.getSize() > 50 * 1024 * 1024) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"视频不能超过 50MB。\"}"); return;
+                }
+                String vname = getSubmittedFileName(videoPart);
+                String vext = vname.contains(".") ? vname.substring(vname.lastIndexOf(".")).toLowerCase() : ".mp4";
+                if (s.getImagePath() != null) {
+                    new java.io.File(req.getServletContext().getRealPath("/"), s.getImagePath()).delete();
+                }
+                String vpath = "images/carousel_video_" + id + vext;
+                Files.copy(videoPart.getInputStream(), Paths.get(req.getServletContext().getRealPath("/"), vpath), StandardCopyOption.REPLACE_EXISTING);
+                s.setImagePath(vpath);
+                s.setVideoUrl(null);
+            }
+            carouselDAO.update(s);
+            resp.getWriter().write("{\"success\":true,\"message\":\"已更新！\"}");
+            return;
+        }
+
+        // PUT /api/admin/carousel/:id/sort — 排序
+        if (path.matches("/api/admin/carousel/\\d+/sort") && "PUT".equals(method)) {
+            int id = Integer.parseInt(path.substring(path.lastIndexOf("/sort") - 1, path.lastIndexOf("/sort")));
+            // Actually parse the ID correctly
+            String[] parts = path.split("/");
+            int slideId = Integer.parseInt(parts[parts.length - 2]);
+            String direction = req.getParameter("direction");
+            boolean ok = carouselDAO.moveSlide(slideId, direction);
+            resp.getWriter().write("{\"success\":" + ok + ",\"message\":\"" + (ok ? "已移动" : "无法移动") + "\"}");
+            return;
+        }
+
+        // DELETE /api/admin/carousel/:id — 删除幻灯片
+        if (path.matches("/api/admin/carousel/\\d+") && "DELETE".equals(method)) {
+            int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            CarouselSlide s = carouselDAO.getById(id);
+            if (s != null && s.getImagePath() != null) {
+                new java.io.File(req.getServletContext().getRealPath("/"), s.getImagePath()).delete();
+            }
+            carouselDAO.delete(id);
+            resp.getWriter().write("{\"success\":true,\"message\":\"幻灯片已删除。\"}");
+            return;
+        }
+    }
+
     /** REST API - 统计 */
     private void handleStatsAPI(HttpServletRequest req, HttpServletResponse resp)
             throws Exception {
@@ -743,6 +992,97 @@ public class BlogServlet extends HttpServlet {
             req.getRequestDispatcher("/chat_room.jsp").forward(req, resp);
         } else {
             req.getRequestDispatcher("/chat.jsp").forward(req, resp);
+        }
+    }
+
+    // ============================================
+    // 住人公开 API（个人主页数据）
+    // ============================================
+    private void handleUsersAPI(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        resp.setContentType("application/json;charset=UTF-8");
+        User currentUser = getCurrentUser(req);
+        if (currentUser == null) {
+            resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+            return;
+        }
+        String path = req.getRequestURI().substring(req.getContextPath().length());
+        String method = req.getMethod();
+
+        // GET /api/users/:id — 获取公开用户资料
+        if (path.matches("/api/users/\\d+") && method.equals("GET")) {
+            int targetId = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
+            User targetUser = userDAO.findById(targetId);
+            if (targetUser == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"住人未找到。\"}");
+                return;
+            }
+
+            int postCount = userDAO.getPostCount(targetId);
+            int commentCount = userDAO.getCommentCount(targetId);
+            int friendCount = friendDAO.getFriendCount(targetId);
+
+            // 判断关系
+            String relationship;
+            int friendshipId = 0;
+            if (currentUser.getId() == targetId) {
+                relationship = "self";
+            } else {
+                Friend rel = friendDAO.getRelationshipBetween(currentUser.getId(), targetId);
+                if (rel == null) {
+                    relationship = "none";
+                } else if ("accepted".equals(rel.getStatus())) {
+                    relationship = "friend";
+                    friendshipId = rel.getId();
+                } else if (rel.getUserId() == currentUser.getId()) {
+                    relationship = "pending_sent";
+                    friendshipId = rel.getId();
+                } else {
+                    relationship = "pending_received";
+                    friendshipId = rel.getId();
+                }
+            }
+
+            // 最近文章
+            List<Post> recentPosts = postDAO.getPostsByAuthor(targetUser.getNickname(), 1, 5);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("{\"success\":true,\"data\":{");
+            sb.append("\"id\":").append(targetUser.getId());
+            sb.append(",\"username\":\"").append(escapeJson(targetUser.getUsername())).append("\"");
+            sb.append(",\"nickname\":\"").append(escapeJson(targetUser.getNickname())).append("\"");
+            sb.append(",\"avatar\":").append(targetUser.getAvatar() != null ? "\"" + escapeJson(targetUser.getAvatar()) + "\"" : "null");
+            sb.append(",\"role\":\"").append(escapeJson(targetUser.getRole())).append("\"");
+            sb.append(",\"createdAt\":\"").append(targetUser.getCreatedAt() != null ? targetUser.getCreatedAt().toString() : "").append("\"");
+            sb.append(",\"postCount\":").append(postCount);
+            sb.append(",\"commentCount\":").append(commentCount);
+            sb.append(",\"friendCount\":").append(friendCount);
+            sb.append(",\"relationship\":\"").append(relationship).append("\"");
+            if (friendshipId > 0) {
+                sb.append(",\"friendshipId\":").append(friendshipId);
+            }
+            sb.append(",\"recentPosts\":[");
+            for (int i = 0; i < recentPosts.size(); i++) {
+                if (i > 0) sb.append(",");
+                Post p = recentPosts.get(i);
+                sb.append("{\"id\":").append(p.getId());
+                sb.append(",\"title\":\"").append(escapeJson(p.getTitle())).append("\"");
+                String excerpt = p.getExcerpt();
+                if (excerpt == null || excerpt.isEmpty()) {
+                    String content = p.getContent();
+                    excerpt = content != null ? content.replaceAll("<[^>]*>", "") : "";
+                    if (excerpt.length() > 200) excerpt = excerpt.substring(0, 200) + "...";
+                }
+                sb.append(",\"excerpt\":\"").append(escapeJson(excerpt)).append("\"");
+                sb.append(",\"created_at\":\"").append(p.getCreatedAt() != null ? p.getCreatedAt().toString() : "").append("\"");
+                sb.append(",\"view_count\":").append(p.getViewCount());
+                sb.append(",\"category_name\":\"").append(escapeJson(p.getCategoryName() != null ? p.getCategoryName() : "")).append("\"");
+                sb.append(",\"category_icon\":\"").append(escapeJson(p.getCategoryIcon() != null ? p.getCategoryIcon() : "")).append("\"");
+                sb.append(",\"tags\":\"").append(escapeJson(p.getTags() != null ? p.getTags() : "")).append("\"");
+                sb.append("}");
+            }
+            sb.append("]}}");
+            resp.getWriter().write(sb.toString());
         }
     }
 
@@ -1127,10 +1467,35 @@ public class BlogServlet extends HttpServlet {
         sb.append(",\"tags\":\"").append(escapeJson(p.getTags())).append("\"");
         sb.append(",\"view_count\":").append(p.getViewCount());
         sb.append(",\"is_published\":").append(p.getIsPublished());
+        if (p.getCreatedAt() != null)
+            sb.append(",\"created_at\":\"").append(p.getCreatedAt().toString()).append("\"");
+        if (p.getUpdatedAt() != null)
+            sb.append(",\"updated_at\":\"").append(p.getUpdatedAt().toString()).append("\"");
         if (p.getCategoryName() != null)
             sb.append(",\"category_name\":\"").append(escapeJson(p.getCategoryName())).append("\"");
         if (p.getCategoryIcon() != null)
             sb.append(",\"category_icon\":\"").append(escapeJson(p.getCategoryIcon())).append("\"");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String toCarouselJson(CarouselSlide s, String ctx) {
+        StringBuilder sb = new StringBuilder("{");
+        sb.append("\"id\":").append(s.getId());
+        sb.append(",\"type\":\"").append(escapeJson(s.getType())).append("\"");
+        sb.append(",\"image_path\":").append(s.getImagePath() != null ? "\"" + escapeJson(s.getImagePath()) + "\"" : "null");
+        sb.append(",\"video_url\":").append(s.getVideoUrl() != null ? "\"" + escapeJson(s.getVideoUrl()) + "\"" : "null");
+        sb.append(",\"title\":").append(s.getTitle() != null ? "\"" + escapeJson(s.getTitle()) + "\"" : "null");
+        sb.append(",\"sort_order\":").append(s.getSortOrder());
+        sb.append(",\"is_active\":").append(s.getIsActive());
+        if (s.getImagePath() != null) {
+            sb.append(",\"url\":\"").append(escapeJson(ctx + "/" + s.getImagePath() + "?t=" + s.getCreatedAt().getTime())).append("\"");
+            if ("video".equals(s.getType())) {
+                sb.append(",\"local_video_url\":\"").append(escapeJson(ctx + "/" + s.getImagePath())).append("\"");
+            }
+        }
+        String thumb = s.getThumbUrl();
+        if (thumb != null) sb.append(",\"thumb\":\"").append(escapeJson(thumb)).append("\"");
         sb.append("}");
         return sb.toString();
     }

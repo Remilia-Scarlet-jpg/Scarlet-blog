@@ -98,6 +98,54 @@ public class UserDAO {
     }
 
     /**
+     * 按 ID 查找用户（不含密码，用于公开主页）
+     */
+    public User findById(int userId) throws SQLException {
+        String sql = "SELECT id, username, nickname, avatar, role, created_at FROM users WHERE id = ?";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return mapUser(rs);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return null;
+    }
+
+    /**
+     * 查询指定用户的已发布文章数（通过 nickname→author 关联）
+     */
+    public int getPostCount(int userId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM posts p JOIN users u ON u.nickname = p.author WHERE u.id = ? AND p.is_published = 1";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return 0;
+    }
+
+    /**
+     * 查询指定用户的评论数（通过 nickname→author 关联）
+     */
+    public int getCommentCount(int userId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM comments c JOIN users u ON u.nickname = c.author WHERE u.id = ?";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return 0;
+    }
+
+    /**
      * 查询全部用户（仅管理员）
      */
     public List<User> getAllUsers() throws SQLException {

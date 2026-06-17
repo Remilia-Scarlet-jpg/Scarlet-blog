@@ -218,6 +218,18 @@ public class DBUtil {
                 "FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+            // 轮播图表
+            stmt.execute("CREATE TABLE carousel_slides (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY," +
+                "type VARCHAR(10) NOT NULL DEFAULT 'image'," +
+                "image_path VARCHAR(500) DEFAULT NULL," +
+                "video_url VARCHAR(500) DEFAULT NULL," +
+                "title VARCHAR(200) DEFAULT NULL," +
+                "sort_order INT NOT NULL DEFAULT 0," +
+                "is_active TINYINT DEFAULT 1," +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
             // 种子数据 - 分类
             stmt.execute("INSERT INTO categories (name, description, icon) VALUES " +
                 "('幻想乡日记', '记录红魔馆的日常生活', '🏰')," +
@@ -254,6 +266,12 @@ public class DBUtil {
             // 种子数据 - 公共茶室
             stmt.execute("INSERT INTO chat_rooms (name, type, created_by) VALUES ('红魔馆大厅', 'public', 1)");
             stmt.execute("INSERT INTO chat_room_members (room_id, user_id) VALUES (1, 1), (1, 2)");
+
+            // 种子数据 - 轮播图
+            stmt.execute("INSERT INTO carousel_slides (type, image_path, title, sort_order) VALUES " +
+                "('image', 'images/slide_1.jpg', '红魔馆', 1)," +
+                "('image', 'images/slide_2.jpg', '红魔馆', 2)," +
+                "('image', 'images/slide_3.jpg', '红魔馆', 3)");
 
             } // end if (isNew)
             // ===== 增量迁移：已有数据库补充新表 =====
@@ -321,6 +339,27 @@ public class DBUtil {
                         "FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE," +
                         "FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE" +
                         ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                }
+                rs.close();
+
+                rs = stmt.executeQuery("SHOW TABLES LIKE 'carousel_slides'");
+                if (!rs.next()) {
+                    System.out.println("[DB] Creating incremental table: carousel_slides");
+                    stmt.execute("CREATE TABLE carousel_slides (" +
+                        "id INT AUTO_INCREMENT PRIMARY KEY," +
+                        "type VARCHAR(10) NOT NULL DEFAULT 'image'," +
+                        "image_path VARCHAR(500) DEFAULT NULL," +
+                        "video_url VARCHAR(500) DEFAULT NULL," +
+                        "title VARCHAR(200) DEFAULT NULL," +
+                        "sort_order INT NOT NULL DEFAULT 0," +
+                        "is_active TINYINT DEFAULT 1," +
+                        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                    // 迁移现有 3 张轮播图
+                    stmt.execute("INSERT INTO carousel_slides (type, image_path, title, sort_order) VALUES " +
+                        "('image', 'images/slide_1.jpg', '红魔馆', 1)," +
+                        "('image', 'images/slide_2.jpg', '红魔馆', 2)," +
+                        "('image', 'images/slide_3.jpg', '红魔馆', 3)");
                 }
                 rs.close();
 

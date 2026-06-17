@@ -1,5 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.util.List, com.scarletblog.model.Post, com.scarletblog.model.Category, com.scarletblog.model.User" %>
+<%@ page import="java.util.List, com.scarletblog.model.Post, com.scarletblog.model.Category, com.scarletblog.model.User, com.scarletblog.model.CarouselSlide" %>
 <%@ page import="com.scarletblog.util.HtmlUtil" %>
 <%
     List<Post> posts = (List<Post>) request.getAttribute("posts");
@@ -12,6 +12,7 @@
     Integer totalComments = (Integer) request.getAttribute("totalComments");
     Integer totalViews = (Integer) request.getAttribute("totalViews");
     User currentUser = (User) request.getAttribute("currentUser");
+    List<CarouselSlide> slides = (List<CarouselSlide>) request.getAttribute("slides");
     String ctxPath = request.getContextPath();
     if (currentPage == null) currentPage = 1;
     if (totalPages == null) totalPages = 1;
@@ -43,11 +44,12 @@
                 <% if (currentUser != null) { %>
                     <a href="<%=ctxPath%>/blog/chat" title="茶话会" id="navChatLink">🍵 茶话会<span id="navChatBadge" class="nav-badge" style="display:none;">0</span></a>
                     <a href="#" onclick="openCreatePostModal();return false;" title="撰写文章">📝 撰写</a>
-                    <a href="<%=ctxPath%>/blog/profile" title="访客档案" style="display:flex;align-items:center;gap:6px;">
+                    <a href="<%=ctxPath%>/blog/user?id=<%=currentUser.getId()%>" title="访客档案" style="display:flex;align-items:center;gap:6px;">
                         <img src="<%= currentUser.getAvatar() != null ? (currentUser.getAvatar().startsWith("data:") ? currentUser.getAvatar() : ctxPath + "/" + currentUser.getAvatar()) : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%234a0000'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12'%3E👤%3C/text%3E%3C/svg%3E" %>"
                              style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">
                         <%= HtmlUtil.escape(currentUser.getNickname()) %>
                     </a>
+                    <a href="<%=ctxPath%>/blog/user?id=<%=currentUser.getId()%>" title="我的主页">🏷️ 我的主页</a>
                     <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light)">🚪 离馆</a>
                 <% } else { %>
                     <a href="<%=ctxPath%>/blog/login" title="入馆通行">⚜️ 入馆</a>
@@ -63,25 +65,41 @@
                 <p>欢迎来到幻想乡一隅的红魔馆</p>
             </div>
 
-            <%-- 轮播图 --%>
+            <%-- 轮播图（数据库驱动） --%>
             <div class="carousel-container">
                 <div class="carousel-track" id="carouselTrack">
-                    <div class="carousel-slide">
-                        <img src="<%=ctxPath%>/images/slide_1.jpg" alt="红魔馆">
+                    <% if (slides != null && !slides.isEmpty()) {
+                        for (int si = 0; si < slides.size(); si++) {
+                            CarouselSlide s = slides.get(si);
+                            String imgPath = s.getImagePath();
+                            boolean isFirst = (si == 0);
+                    %>
+                    <div class="carousel-slide" data-type="<%= s.getType() %>">
+                        <% if ("video".equals(s.getType())) {
+                            String videoSrc = (imgPath != null && !imgPath.isEmpty())
+                                ? ctxPath + "/" + imgPath
+                                : (s.getVideoUrl() != null ? s.getVideoUrl() : null);
+                            if (videoSrc != null) {
+                        %>
+                            <video src="<%= videoSrc %>" muted loop playsinline preload="metadata"></video>
+                        <%   }
+                           } else if (imgPath != null && !imgPath.isEmpty()) { %>
+                            <img src="<%=ctxPath%>/<%= imgPath %>?t=<%= s.getCreatedAt() != null ? s.getCreatedAt().getTime() : System.currentTimeMillis() %>" alt="<%= HtmlUtil.escape(s.getTitle() != null ? s.getTitle() : "") %>">
+                        <% } %>
                     </div>
-                    <div class="carousel-slide">
-                        <img src="<%=ctxPath%>/images/slide_2.jpg" alt="红魔馆">
-                    </div>
-                    <div class="carousel-slide">
-                        <img src="<%=ctxPath%>/images/slide_3.jpg" alt="红魔馆">
-                    </div>
+                    <%     }
+                       } else { %>
+                    <div class="carousel-slide"><img src="<%=ctxPath%>/images/slide_1.jpg" alt="红魔馆"></div>
+                    <% } %>
                 </div>
                 <button class="carousel-arrow carousel-prev" onclick="changeSlide(-1)" title="上一张">◀</button>
                 <button class="carousel-arrow carousel-next" onclick="changeSlide(1)" title="下一张">▶</button>
                 <div class="carousel-dots" id="carouselDots">
-                    <span class="carousel-dot active" onclick="goToSlide(0)"></span>
-                    <span class="carousel-dot" onclick="goToSlide(1)"></span>
-                    <span class="carousel-dot" onclick="goToSlide(2)"></span>
+                    <% if (slides != null) {
+                        for (int si = 0; si < slides.size(); si++) { %>
+                    <span class="carousel-dot<%= si == 0 ? " active" : "" %>" onclick="goToSlide(<%=si%>)"></span>
+                    <%     }
+                       } %>
                 </div>
             </div>
 
@@ -214,10 +232,10 @@
     <script src="<%=ctxPath%>/js/lightbox.js"></script>
     <script>
         // ============================================
-        // 🎠 红魔馆轮播
+        // 🎠 红魔馆轮播（数据库驱动，支持视频）
         // ============================================
         var currentSlide = 0;
-        var totalSlides = 3;
+        var totalSlides = document.querySelectorAll('.carousel-slide').length || 1;
         var slideInterval;
 
         function showSlide(index) {
@@ -225,11 +243,26 @@
             var dots = document.querySelectorAll('.carousel-dot');
             if (index >= totalSlides) index = 0;
             if (index < 0) index = totalSlides - 1;
+
+            // 暂停当前视频
+            var prevSlide = document.querySelectorAll('.carousel-slide')[currentSlide];
+            if (prevSlide) {
+                var prevVideo = prevSlide.querySelector('video');
+                if (prevVideo) prevVideo.pause();
+            }
+
             currentSlide = index;
             track.style.transform = 'translateX(-' + (currentSlide * 100) + '%)';
             dots.forEach(function(d, i) {
                 d.classList.toggle('active', i === currentSlide);
             });
+
+            // 播放新视频
+            var newSlide = document.querySelectorAll('.carousel-slide')[currentSlide];
+            if (newSlide) {
+                var newVideo = newSlide.querySelector('video');
+                if (newVideo) newVideo.play().catch(function(){});
+            }
         }
 
         function changeSlide(dir) {
@@ -248,7 +281,9 @@
         }
 
         // 启动轮播
-        slideInterval = setInterval(function() { changeSlide(1); }, 5000);
+        if (totalSlides > 1) {
+            slideInterval = setInterval(function() { changeSlide(1); }, 5000);
+        }
 
         // 触摸滑动支持
         (function() {

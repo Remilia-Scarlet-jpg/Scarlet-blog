@@ -196,6 +196,42 @@ public class FriendDAO {
         return null;
     }
 
+    /** 获取用户的友人数量 */
+    public int getFriendCount(int userId) throws SQLException {
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(
+                "SELECT COUNT(*) FROM friends WHERE (user_id = ? OR friend_id = ?) AND status = 'accepted'");
+            pstmt.setInt(1, userId);
+            pstmt.setInt(2, userId);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return 0;
+    }
+
+    /** 获取两个用户之间的最近一条非 rejected 关系记录（用于个人主页按钮状态） */
+    public Friend getRelationshipBetween(int userId1, int userId2) throws SQLException {
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(
+                "SELECT f.id, f.user_id, f.friend_id, f.status, f.created_at, " +
+                "u.username AS f_username, u.nickname AS f_nickname, u.avatar AS f_avatar " +
+                "FROM friends f JOIN users u ON u.id = f.friend_id " +
+                "WHERE ((f.user_id = ? AND f.friend_id = ?) OR (f.user_id = ? AND f.friend_id = ?)) " +
+                "AND f.status IN ('pending', 'accepted') LIMIT 1");
+            pstmt.setInt(1, userId1);
+            pstmt.setInt(2, userId2);
+            pstmt.setInt(3, userId2);
+            pstmt.setInt(4, userId1);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return mapFriend(rs);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return null;
+    }
+
     private Friend mapFriend(ResultSet rs) throws SQLException {
         Friend f = new Friend();
         f.setId(rs.getInt("id"));

@@ -15,17 +15,15 @@
 ### 📝 博客
 - 文章列表（分页、搜索、分类筛选）
 - 文章详情（浏览量自增、HTML 富文本）
-- 首页动态轮播（数据库驱动，支持图片/视频，可自由增减排序）
+- 首页图片轮播（3 张，5 秒自动切换）
 - 评论区（AJAX 提交 + 30 秒轮询新评论）
 
 ### 👤 用户系统
 - 注册 / 登录 / 登出
 - PBKDF2-SHA256 密码哈希（12 万次迭代 + 随机盐）
 - 角色系统：馆主 / 女仆长 / 住人
-- 公开个人主页（B 站风格 Banner + 统计 + 好友按钮 + 文章列表）
 - 个人档案页（QQ 风格头像裁剪器、改昵称、改密码）
 - 头像 Base64 存数据库，容器重启不丢失
-- 茶话会 / 茶室点击头像访问对方主页
 
 ### 🛡️ 管理后台
 - 文章 CRUD（所有登录用户可创作）
@@ -103,12 +101,10 @@ GET    /api/admin/users       用户列表（管理员）
 - Tomcat 9
 - MySQL 8
 
-> ⚠️ **MySQL 8 注意**：本地 JDBC 连接可能需要 `allowPublicKeyRetrieval=true`。详见 `src/.../util/DBUtil.java`（本地版 fallback 为 `localhost:3306`，`sslMode=DISABLED`）。
-
 ### 步骤
 ```bash
 # 1. 创建数据库
-mysql -u root -p -e "CREATE DATABASE scarlet_blog CHARACTER SET utf8mb4"
+mysql -u root -p -e "CREATE DATABASE scarlet_blog"
 
 # 2. 设置环境变量
 export DB_HOST=localhost
@@ -117,16 +113,15 @@ export DB_NAME=scarlet_blog
 export DB_USER=root
 export DB_PASS=your_password
 
-# 3. 编译（Eclipse 项目，输出到 bin/）
+# 3. 编译
 javac -encoding UTF-8 \
-  -cp "servlet-api.jar;mysql-connector-j-9.3.0.jar;tomcat-jdbc.jar" \
-  -d bin \
+  -cp servlet-api.jar:mysql-connector-j-9.3.0.jar:tomcat-jdbc.jar \
+  -d WebContent/WEB-INF/classes \
   $(find src -name "*.java")
 
-# 4. 部署到 Tomcat
-cp -r WebContent/* bin/com/ $TOMCAT_HOME/webapps/myblog/
+# 4. 部署到 Tomcat webapps/
 
-# 5. 启动 Tomcat，访问 http://localhost:8080/myblog/blog
+# 5. 启动 Tomcat，访问 http://localhost:8080/<app>/
 ```
 
 首次启动自动建表 + 插入种子数据（6 篇东方主题文章 + 8 条评论 + 5 个分类）。

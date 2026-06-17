@@ -400,7 +400,8 @@
                 <% if (currentUser != null && currentUser.isAdmin()) { %><a href="<%=ctxPath%>/blog/admin">⚙️ 管理室</a><% } %>
                 <a href="<%=ctxPath%>/blog/chat" title="茶话会" id="navChatLink">🍵 茶话会<span id="navChatBadge" class="nav-badge" style="display:none;">0</span></a>
                 <a href="<%=ctxPath%>/blog/profile" class="active">👤 档案</a>
-                <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light);border:1px solid var(--scarlet);">🚪 离馆</a>
+                <a href="<%=ctxPath%>/blog/user?id=<%=currentUser.getId()%>" title="我的主页">🏷️ 我的主页</a>
+                    <a href="<%=ctxPath%>/api/auth/logout" title="离馆" style="color:var(--scarlet-light);border:1px solid var(--scarlet);">🚪 离馆</a>
             </nav>
         </div>
     </header>
