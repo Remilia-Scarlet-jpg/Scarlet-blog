@@ -10,6 +10,7 @@ public class CarouselSlide {
     private String type = "image";  // "image" or "video"
     private String imagePath;
     private String videoUrl;
+    private String poster;      // 封面图（视频用）
     private String title;
     private int sortOrder;
     private int isActive = 1;
@@ -27,6 +28,9 @@ public class CarouselSlide {
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
 
+    public String getPoster() { return poster; }
+    public void setPoster(String poster) { this.poster = poster; }
+
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
 
@@ -39,11 +43,42 @@ public class CarouselSlide {
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }
 
-    /** 获取缩略图 URL（用于管理面板预览） */
+    /** 获取封面 URL（优先 poster → imagePath → YouTube 缩略图） */
+    public String getPosterUrl(String ctxPath) {
+        // 自定义 poster
+        if (poster != null && !poster.isEmpty()) {
+            if (poster.startsWith("http")) return poster;
+            return ctxPath + "/" + poster;
+        }
+        // 图片直接返回自身
+        if ("image".equals(type) && imagePath != null && !imagePath.isEmpty()) {
+            return ctxPath + "/" + imagePath;
+        }
+        // 视频有本地文件 → 返回本地视频文件路径（浏览器取第一帧）
+        if ("video".equals(type) && imagePath != null && !imagePath.isEmpty()) {
+            return ctxPath + "/" + imagePath;
+        }
+        // YouTube 缩略图
+        if ("video".equals(type) && videoUrl != null) {
+            if (videoUrl.contains("youtube.com/watch?v=")) {
+                String vid = videoUrl.substring(videoUrl.indexOf("v=") + 2);
+                int amp = vid.indexOf('&');
+                if (amp > 0) vid = vid.substring(0, amp);
+                return "https://img.youtube.com/vi/" + vid + "/hqdefault.jpg";
+            }
+            if (videoUrl.contains("youtu.be/")) {
+                String vid = videoUrl.substring(videoUrl.lastIndexOf('/') + 1);
+                return "https://img.youtube.com/vi/" + vid + "/hqdefault.jpg";
+            }
+        }
+        return null;
+    }
+
+    /** @deprecated 使用 getPosterUrl(ctx) 代替 */
     public String getThumbUrl() {
+        if (poster != null && !poster.isEmpty()) return poster;
         if ("image".equals(type) && imagePath != null) return imagePath;
         if ("video".equals(type) && videoUrl != null) {
-            // YouTube 缩略图
             if (videoUrl.contains("youtube.com/watch?v=")) {
                 String vid = videoUrl.substring(videoUrl.indexOf("v=") + 2);
                 int amp = vid.indexOf('&');

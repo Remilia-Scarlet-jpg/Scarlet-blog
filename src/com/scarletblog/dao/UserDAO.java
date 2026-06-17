@@ -85,7 +85,7 @@ public class UserDAO {
      * 按用户名查找用户（不含密码）
      */
     public User findByUsername(String username) throws SQLException {
-        String sql = "SELECT id, username, nickname, avatar, role, created_at FROM users WHERE username = ?";
+        String sql = "SELECT id, username, nickname, avatar, background, role, created_at FROM users WHERE username = ?";
         Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
@@ -101,7 +101,7 @@ public class UserDAO {
      * 按 ID 查找用户（不含密码，用于公开主页）
      */
     public User findById(int userId) throws SQLException {
-        String sql = "SELECT id, username, nickname, avatar, role, created_at FROM users WHERE id = ?";
+        String sql = "SELECT id, username, nickname, avatar, background, role, created_at FROM users WHERE id = ?";
         Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
@@ -150,7 +150,7 @@ public class UserDAO {
      */
     public List<User> getAllUsers() throws SQLException {
         List<User> users = new ArrayList<>();
-        String sql = "SELECT id, username, nickname, role, avatar, created_at FROM users ORDER BY id";
+        String sql = "SELECT id, username, nickname, role, avatar, background, created_at FROM users ORDER BY id";
         Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
@@ -162,14 +162,15 @@ public class UserDAO {
     }
 
     /**
-     * 更新用户资料（昵称、头像）
+     * 更新用户资料（昵称、头像、背景图）
      */
-    public boolean updateProfile(int userId, String nickname, String avatar) throws SQLException {
+    public boolean updateProfile(int userId, String nickname, String avatar, String background) throws SQLException {
         StringBuilder sql = new StringBuilder("UPDATE users SET ");
         List<Object> params = new ArrayList<>();
 
         if (nickname != null) { sql.append("nickname = ?, "); params.add(nickname); }
         if (avatar != null) { sql.append("avatar = ?, "); params.add(avatar); }
+        if (background != null) { sql.append("background = ?, "); params.add(background); }
         if (params.isEmpty()) return false;
 
         sql.setLength(sql.length() - 2);
@@ -181,6 +182,21 @@ public class UserDAO {
             conn = DBUtil.getConnection();
             pstmt = conn.prepareStatement(sql.toString());
             for (int i = 0; i < params.size(); i++) pstmt.setObject(i + 1, params.get(i));
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, null); }
+    }
+
+    /**
+     * 更新用户身份（仅馆主可调用，Servlet 层鉴权）
+     */
+    public boolean updateRole(int userId, String newRole) throws SQLException {
+        String sql = "UPDATE users SET role = ? WHERE id = ?";
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, newRole);
+            pstmt.setInt(2, userId);
             return pstmt.executeUpdate() > 0;
         } finally { DBUtil.close(conn, pstmt, null); }
     }
@@ -216,6 +232,7 @@ public class UserDAO {
         u.setPassword(null);
         u.setNickname(rs.getString("nickname"));
         try { u.setAvatar(rs.getString("avatar")); } catch (SQLException e) {}
+        try { u.setBackground(rs.getString("background")); } catch (SQLException e) {}
         u.setRole(rs.getString("role"));
         u.setCreatedAt(rs.getTimestamp("created_at"));
         return u;

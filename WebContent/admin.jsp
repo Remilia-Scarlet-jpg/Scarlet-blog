@@ -82,6 +82,7 @@
                 <button class="admin-tab active" onclick="switchAdminTab('posts')">📋 文章管理</button>
                 <button class="admin-tab" onclick="switchAdminTab('categories')">📂 分类管理</button>
                 <button class="admin-tab" onclick="switchAdminTab('carousel')">🖼️ 轮播图</button>
+                <button class="admin-tab" onclick="switchAdminTab('users')">👥 用户管理</button>
             </div>
 
             <!-- 文章管理 -->
@@ -181,6 +182,34 @@
                     <div style="text-align:center;padding:20px;color:var(--text-muted);">加载中...</div>
                 </div>
             </div>
+
+            <!-- 用户管理 -->
+            <div id="admin-tab-users" class="admin-tab-content">
+                <div class="admin-header">
+                    <h2>👥 住人名单</h2>
+                </div>
+                <p style="color:var(--text-muted);margin-bottom:16px;">
+                    仅馆主大人可以任命或解除女仆长。身份为 <strong style="color:var(--gold);">住人</strong> 可升为女仆长，<strong style="color:var(--gold);">女仆长</strong> 可降为住人。
+                </p>
+                <div style="overflow-x:auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>头像</th>
+                                <th>名札</th>
+                                <th>称呼</th>
+                                <th>身份</th>
+                                <th>入馆日期</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <tr><td colspan="7">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -249,6 +278,7 @@
     <script>
         var API_BASE = '<%=ctxPath%>/api';
         var ctxPath = '<%=ctxPath%>';
+        var _currentUserRole = '<%= currentUser != null ? currentUser.getRole() : "" %>';
 
         function openCreateModal() {
             document.getElementById('modalTitle').textContent = '📝 新建文章';
@@ -402,6 +432,10 @@
                 document.querySelectorAll('.admin-tab')[2].classList.add('active');
                 document.getElementById('admin-tab-carousel').classList.add('active');
                 loadCarousel();
+            } else if (tab === 'users') {
+                document.querySelectorAll('.admin-tab')[3].classList.add('active');
+                document.getElementById('admin-tab-users').classList.add('active');
+                loadUsers();
             }
         }
 
@@ -440,17 +474,20 @@
                         return;
                     }
                     var html = '';
+                    // 缓存 slide 数据供编辑弹窗使用
+                    window._slideCache = {};
                     d.data.forEach(function(s) {
+                        window._slideCache[s.id] = s;
                         var typeIcon = s.type === 'video' ? '🎬' : '🖼️';
                         var previewHtml;
-                        if (s.type === 'video') {
-                            previewHtml = s.thumb
-                                ? '<img src="' + s.thumb + '" style="width:100%;height:140px;object-fit:cover;border-radius:4px;border:1px solid var(--border-dark);">'
-                                : '<div style="width:100%;height:140px;background:var(--bg-dark);border-radius:4px;border:1px dashed var(--border-dark);display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>';
+                        var posterSrc = s.poster || s.url || '';
+                        if (posterSrc) {
+                            previewHtml = '<div style="position:relative;">' +
+                                '<img src="' + posterSrc + '" style="width:100%;height:140px;object-fit:cover;border-radius:4px;border:1px solid var(--border-dark);" onerror="this.parentElement.innerHTML=\'<div style=width:100%;height:140px;background:var(--bg-dark);border-radius:4px;border:1px dashed var(--border-dark);display:flex;align-items:center;justify-content:center;font-size:2rem;>' + (s.type === 'video' ? '🎬' : '🖼️') + '</div>\'">' +
+                                (s.type === 'video' ? '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2.5rem;color:white;text-shadow:0 0 10px rgba(0,0,0,0.8);pointer-events:none;">▶</div>' : '') +
+                                '</div>';
                         } else {
-                            previewHtml = s.url
-                                ? '<img src="' + s.url + '" style="width:100%;height:140px;object-fit:cover;border-radius:4px;border:1px solid var(--border-dark);">'
-                                : '<div style="width:100%;height:140px;background:var(--bg-dark);border-radius:4px;border:1px dashed var(--border-dark);display:flex;align-items:center;justify-content:center;font-size:2rem;">🖼️</div>';
+                            previewHtml = '<div style="width:100%;height:140px;background:var(--bg-dark);border-radius:4px;border:1px dashed var(--border-dark);display:flex;align-items:center;justify-content:center;font-size:2rem;">' + (s.type === 'video' ? '🎬' : '🖼️') + '</div>';
                         }
                         html += '<div style="background:linear-gradient(180deg,#1a0d0d,#0f0808);border:1px solid #2a1010;border-radius:8px;padding:12px;text-align:center;">' +
                             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
@@ -469,23 +506,94 @@
                 });
         }
 
+        // ===== 用户管理 =====
+        function loadUsers() {
+            fetch(API_BASE + '/admin/users')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (!d.success) return;
+                    if (!d.data || !d.data.length) {
+                        document.getElementById('userTableBody').innerHTML =
+                            '<tr><td colspan="7">暂无住人</td></tr>';
+                        return;
+                    }
+                    var html = '';
+                    d.data.forEach(function(u) {
+                        var avatarHtml;
+                        if (u.avatar) {
+                            avatarHtml = '<img src="' + (u.avatar.startsWith('data:') ? u.avatar : ctxPath + '/' + u.avatar) +
+                                '" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--gold);">';
+                        } else {
+                            avatarHtml = '<div style="width:36px;height:36px;border-radius:50%;background:var(--scarlet-deep);' +
+                                'display:flex;align-items:center;justify-content:center;font-size:0.8rem;">👤</div>';
+                        }
+                        var roleColor = u.role === '馆主' ? 'var(--gold)' : u.role === '女仆长' ? 'var(--scarlet-light)' : 'var(--text-muted)';
+                        html += '<tr>' +
+                            '<td>' + u.id + '</td>' +
+                            '<td>' + avatarHtml + '</td>' +
+                            '<td>' + escHtml(u.username) + '</td>' +
+                            '<td><strong>' + escHtml(u.nickname) + '</strong></td>' +
+                            '<td><span style="color:' + roleColor + ';font-weight:600;">' + escHtml(u.role) + '</span></td>' +
+                            '<td>' + (u.createdAt ? u.createdAt.substring(0, 10) : '-') + '</td>' +
+                            '<td>' + getRoleActionButton(u) + '</td>' +
+                            '</tr>';
+                    });
+                    document.getElementById('userTableBody').innerHTML = html;
+                });
+        }
+
+        function getRoleActionButton(u) {
+            if (_currentUserRole !== '馆主') return '';
+            if (u.role === '馆主') return '<span style="color:var(--text-muted);font-size:0.8rem;">馆主大人</span>';
+            if (u.role === '女仆长') {
+                return '<button class="btn-scarlet-outline btn-danger" onclick="changeRole(' + u.id + ',\'住人\',\'' + escHtml(u.nickname) + '\')" style="padding:4px 12px;font-size:0.75rem;">⬇️ 解除女仆长</button>';
+            }
+            if (u.role === '住人') {
+                return '<button class="btn-scarlet-outline" onclick="changeRole(' + u.id + ',\'女仆长\',\'' + escHtml(u.nickname) + '\')" style="padding:4px 12px;font-size:0.75rem;border-color:var(--scarlet-light);color:var(--scarlet-light);">⬆️ 任命女仆长</button>';
+            }
+            return '';
+        }
+
+        function changeRole(userId, newRole, nickname) {
+            var actionText = newRole === '女仆长' ? '任命为女仆长' : '解除女仆长职务';
+            if (!confirm('确定要将 ' + nickname + ' ' + actionText + ' 吗？')) return;
+            var xhr = new XMLHttpRequest();
+            xhr.open('PUT', API_BASE + '/admin/users/' + userId + '/role', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function() {
+                try {
+                    var r = JSON.parse(xhr.responseText);
+                    if (r.success) { showToast(r.message, 'success'); loadUsers(); }
+                    else { showToast(r.error || '操作失败', 'error'); }
+                } catch(ex) { showToast('操作失败', 'error'); }
+            };
+            xhr.send('role=' + encodeURIComponent(newRole));
+        }
+
         function openCarouselModal(id) {
             document.getElementById('editSlideId').value = id || '';
             document.getElementById('carouselModalTitle').textContent = id ? '✏️ 编辑幻灯片' : '➕ 添加幻灯片';
             document.getElementById('editSlideImage').value = '';
             document.getElementById('editSlideImage').required = !id;
-            if (id) {
-                // 从现有卡片数据预填（简化：从DOM获取）
-                document.getElementById('editSlideTitle').value = '';
-                document.getElementById('editSlideVideo').value = '';
-                document.getElementById('editSlideType').value = 'image';
-                document.getElementById('editSlideType').onchange();
+            document.getElementById('editSlideTitle').value = '';
+            document.getElementById('editSlideVideo').value = '';
+            document.getElementById('editSlideVideoFile').value = '';
+            document.getElementById('editSlidePoster').value = '';
+            document.getElementById('editSlidePosterUrl').value = '';
+            if (id && window._slideCache && window._slideCache[id]) {
+                var s = window._slideCache[id];
+                document.getElementById('editSlideType').value = s.type || 'image';
+                document.getElementById('editSlideTitle').value = s.title || '';
+                if (s.type === 'video' && s.video_url) {
+                    document.getElementById('editSlideVideo').value = s.video_url;
+                }
+                if (s.poster_path && s.poster_path.startsWith('http')) {
+                    document.getElementById('editSlidePosterUrl').value = s.poster_path;
+                }
             } else {
-                document.getElementById('editSlideTitle').value = '';
-                document.getElementById('editSlideVideo').value = '';
                 document.getElementById('editSlideType').value = 'image';
-                document.getElementById('editSlideType').onchange();
             }
+            onSlideTypeChange();
             document.getElementById('carouselModal').classList.add('active');
         }
 
@@ -516,6 +624,11 @@
                 if (videoInput.files[0]) fd.append('video_file', videoInput.files[0]);
             }
             if (type === 'image' && fileInput.files[0]) fd.append('image', fileInput.files[0]);
+            // 封面图
+            var posterInput = document.getElementById('editSlidePoster');
+            var posterUrl = document.getElementById('editSlidePosterUrl').value.trim();
+            if (posterInput.files[0]) fd.append('poster', posterInput.files[0]);
+            if (posterUrl) fd.append('poster_url', posterUrl);
 
             if (type === 'image' && !id && !fileInput.files[0]) {
                 showToast('请选择图片文件', 'error'); return;
@@ -636,7 +749,7 @@
 
         function escHtml(s) {
             if (!s) return '';
-            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
         }
     </script>
 
@@ -703,6 +816,12 @@
                         </div>
                         <label style="margin-top:8px;">🔗 视频外链 URL</label>
                         <input type="text" id="editSlideVideo" placeholder="https://example.com/video.mp4 或 YouTube链接" maxlength="500">
+                    </div>
+                    <div class="form-group" id="slidePosterGroup">
+                        <label>🖼️ 封面图 <span style="color:var(--text-muted);font-size:0.75rem;">（可选，video 建议设置）</span></label>
+                        <input type="file" id="editSlidePoster" accept="image/jpeg,image/png,image/gif,image/webp" style="color:var(--text-light);">
+                        <span style="color:var(--text-muted);font-size:0.7rem;">或填入外链 URL</span>
+                        <input type="text" id="editSlidePosterUrl" placeholder="https://example.com/poster.jpg" maxlength="500" style="margin-top:4px;">
                     </div>
                     <div class="form-group">
                         <label>📝 标题</label>

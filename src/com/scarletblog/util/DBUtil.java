@@ -224,6 +224,7 @@ public class DBUtil {
                 "type VARCHAR(10) NOT NULL DEFAULT 'image'," +
                 "image_path VARCHAR(500) DEFAULT NULL," +
                 "video_url VARCHAR(500) DEFAULT NULL," +
+                "poster VARCHAR(500) DEFAULT NULL," +
                 "title VARCHAR(200) DEFAULT NULL," +
                 "sort_order INT NOT NULL DEFAULT 0," +
                 "is_active TINYINT DEFAULT 1," +
@@ -350,6 +351,7 @@ public class DBUtil {
                         "type VARCHAR(10) NOT NULL DEFAULT 'image'," +
                         "image_path VARCHAR(500) DEFAULT NULL," +
                         "video_url VARCHAR(500) DEFAULT NULL," +
+                        "poster VARCHAR(500) DEFAULT NULL," +
                         "title VARCHAR(200) DEFAULT NULL," +
                         "sort_order INT NOT NULL DEFAULT 0," +
                         "is_active TINYINT DEFAULT 1," +
@@ -361,7 +363,20 @@ public class DBUtil {
                         "('image', 'images/slide_2.jpg', '红魔馆', 2)," +
                         "('image', 'images/slide_3.jpg', '红魔馆', 3)");
                 }
+                } else {
+                    // 增量迁移：添加 poster 列
+                    try {
+                        stmt.execute("ALTER TABLE carousel_slides ADD COLUMN poster VARCHAR(500) DEFAULT NULL AFTER video_url");
+                        System.out.println("[DB] Added carousel_slides.poster column");
+                    } catch (SQLException e) { /* 已存在 */ }
+                }
                 rs.close();
+
+                // 增量迁移：添加 background 列
+                try {
+                    stmt.execute("ALTER TABLE users ADD COLUMN background MEDIUMTEXT DEFAULT NULL AFTER avatar");
+                    System.out.println("[DB] Added users.background column");
+                } catch (SQLException e) { /* 已存在 */ }
 
                 // 检查是否需要种子公共茶室
                 rs = stmt.executeQuery("SELECT COUNT(*) FROM chat_rooms WHERE type = 'public'");

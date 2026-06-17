@@ -43,7 +43,7 @@ public class CarouselDAO {
     public int create(CarouselSlide s) throws SQLException {
         // 新幻灯片的 sort_order = 当前最大 + 1
         String nextOrderSql = "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM carousel_slides";
-        String sql = "INSERT INTO carousel_slides (type, image_path, video_url, title, sort_order) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO carousel_slides (type, image_path, video_url, poster, title, sort_order) VALUES (?, ?, ?, ?, ?, ?)";
         Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
@@ -57,8 +57,9 @@ public class CarouselDAO {
             pstmt.setString(1, s.getType());
             pstmt.setString(2, s.getImagePath());
             pstmt.setString(3, s.getVideoUrl());
-            pstmt.setString(4, s.getTitle());
-            pstmt.setInt(5, nextOrder);
+            pstmt.setString(4, s.getPoster());
+            pstmt.setString(5, s.getTitle());
+            pstmt.setInt(6, nextOrder);
             pstmt.executeUpdate();
             rs = pstmt.getGeneratedKeys();
             if (rs.next()) return rs.getInt(1);
@@ -68,7 +69,7 @@ public class CarouselDAO {
 
     /** 更新幻灯片（类型/路径/URL/标题） */
     public boolean update(CarouselSlide s) throws SQLException {
-        String sql = "UPDATE carousel_slides SET type=?, image_path=?, video_url=?, title=? WHERE id=?";
+        String sql = "UPDATE carousel_slides SET type=?, image_path=?, video_url=?, poster=?, title=? WHERE id=?";
         Connection conn = null; PreparedStatement pstmt = null;
         try {
             conn = DBUtil.getConnection();
@@ -76,8 +77,9 @@ public class CarouselDAO {
             pstmt.setString(1, s.getType());
             pstmt.setString(2, s.getImagePath());
             pstmt.setString(3, s.getVideoUrl());
-            pstmt.setString(4, s.getTitle());
-            pstmt.setInt(5, s.getId());
+            pstmt.setString(4, s.getPoster());
+            pstmt.setString(5, s.getTitle());
+            pstmt.setInt(6, s.getId());
             return pstmt.executeUpdate() > 0;
         } finally { DBUtil.close(conn, pstmt, null); }
     }
@@ -154,6 +156,7 @@ public class CarouselDAO {
         s.setType(rs.getString("type"));
         s.setImagePath(rs.getString("image_path"));
         s.setVideoUrl(rs.getString("video_url"));
+        s.setPoster(rs.getString("poster"));
         s.setTitle(rs.getString("title"));
         s.setSortOrder(rs.getInt("sort_order"));
         s.setIsActive(rs.getInt("is_active"));

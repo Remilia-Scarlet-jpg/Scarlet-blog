@@ -28,6 +28,9 @@
     }
 
     boolean isOwnProfile = "self".equals(relationship);
+
+    String backgroundSrc = profileUser.getBackground();
+    boolean hasBg = backgroundSrc != null && !backgroundSrc.isEmpty();
 %>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -39,26 +42,53 @@
     <link rel="stylesheet" href="<%=ctxPath%>/css/scarlet.css">
     <style>
         /* ===== B 站风格住人主页 ===== */
-        .user-banner {
-            background: linear-gradient(180deg, #1a0505 0%, #0d0202 50%, transparent 100%);
-            border: 1px solid #3a1010;
-            border-radius: 12px;
-            padding: 50px 30px 30px;
-            text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 30px rgba(139,0,0,0.25);
+        /* ── 头图区：全宽 Banner ── */
+        .user-profile-header {
+            margin-bottom: 0;
+            overflow: visible;
         }
-        .user-avatar-wrap { display: inline-block; position: relative; }
+        .user-cover {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: linear-gradient(180deg, #2a0a0a 0%, #1a0505 70%, #0d0202 100%);
+            background-size: cover;
+            background-position: center;
+            border-radius: 0 0 8px 8px;
+        }
+        .user-cover .banner-edit-badge {
+            position: absolute; top: 12px; right: 12px;
+            width: 32px; height: 32px; background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 0.85rem; color: #fff;
+            transition: all 0.3s; z-index: 5;
+        }
+        .user-cover .banner-edit-badge:hover { background: rgba(0,0,0,0.7); transform: scale(1.1); }
+        .user-cover.clickable { cursor: pointer; }
+
+        /* ── 信息栏：头像左下角 + 昵称右侧 ── */
+        .user-info-bar {
+            display: flex;
+            align-items: flex-end;
+            padding: 0 30px 16px;
+            margin-top: -64px;
+            position: relative;
+            z-index: 2;
+        }
+        .user-avatar-wrap {
+            position: relative; flex-shrink: 0; margin-right: 24px;
+        }
         .user-avatar-lg {
             width: 160px; height: 160px; border-radius: 50%; object-fit: cover;
-            border: 3px solid var(--gold, #d4af37);
-            box-shadow: 0 0 30px rgba(212,175,55,0.3), 0 0 60px rgba(139,0,0,0.2);
+            border: 4px solid var(--bg-darkest);
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
             transition: transform 0.3s ease;
         }
         .user-avatar-lg:hover { transform: scale(1.05); }
         .user-avatar-lg.clickable { cursor: pointer; }
         .avatar-edit-badge {
-            position: absolute; bottom: 10px; right: 10px;
+            position: absolute; bottom: 8px; right: 8px;
             width: 32px; height: 32px; background: var(--scarlet, #8b0000);
             border: 2px solid var(--gold); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
@@ -66,61 +96,112 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.5); transition: all 0.3s;
         }
         .avatar-edit-badge:hover { background: #a01010; transform: scale(1.1); }
-        .user-role-badge {
-            display: inline-block; background: linear-gradient(135deg, #8b0000, #4a0000);
-            color: var(--gold); font-size: 0.8rem; padding: 3px 14px;
-            border-radius: 12px; border: 1px solid var(--gold); letter-spacing: 2px; margin: 8px 0;
+        .user-info-text {
+            flex: 1; padding-bottom: 8px; min-width: 0;
         }
         .user-nickname-lg {
-            font-size: 1.8rem; color: var(--gold); letter-spacing: 3px;
-            margin: 12px 0 4px; text-shadow: 0 0 20px rgba(212,175,55,0.3);
+            font-size: 1.6rem; color: #fff; letter-spacing: 2px;
+            margin: 0 0 4px; text-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
-        .user-username { font-size: 0.85rem; color: var(--text-muted, #8a7a7a); }
-        .user-join-date { font-size: 0.8rem; color: #6a5050; margin-top: 6px; }
-        .user-stats { display: flex; justify-content: center; gap: 40px; margin: 24px 0 0; flex-wrap: wrap; }
-        .user-stat-item { text-align: center; min-width: 70px; }
-        .user-stat-num { font-size: 1.6rem; font-weight: bold; color: var(--scarlet-light, #cc3333); line-height: 1; }
-        .user-stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+        .user-info-sub {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            font-size: 0.8rem; color: #999;
+        }
+        .user-username { color: #aaa; }
+        .user-role-badge {
+            display: inline-block; background: rgba(139,0,0,0.6);
+            color: var(--gold); font-size: 0.7rem; padding: 2px 10px;
+            border-radius: 10px; border: 1px solid rgba(212,175,55,0.4);
+        }
+        .user-join-date { color: #777; font-size: 0.75rem; }
 
-        /* 操作按钮 */
-        .user-actions { display: flex; justify-content: center; gap: 12px; margin: 20px 0 0; flex-wrap: wrap; }
-        .btn-friend { padding: 8px 24px; border-radius: 20px; font-size: 0.9rem; cursor: pointer; letter-spacing: 1px; transition: all 0.3s ease; font-family: inherit; border: none; }
-        .btn-friend-add { background: linear-gradient(135deg, var(--scarlet), #4a0000); color: var(--gold); border: 1px solid var(--gold); }
-        .btn-friend-add:hover { background: linear-gradient(135deg, #a01010, #6a0000); box-shadow: 0 0 15px rgba(212,175,55,0.3); }
-        .btn-friend-pending { background: #2a1a1a; color: #8a7a7a; border: 1px solid #4a3030; cursor: not-allowed; }
-        .btn-friend-accept { background: linear-gradient(135deg, #1a4a1a, #0a2a0a); color: #7fbf7f; border: 1px solid #7fbf7f; }
-        .btn-friend-accept:hover { background: linear-gradient(135deg, #2a5a2a, #1a3a1a); }
-        .btn-friend-decline { background: linear-gradient(135deg, #3a1010, #1a0505); color: #cc6666; border: 1px solid #cc6666; }
-        .btn-friend-decline:hover { background: linear-gradient(135deg, #4a1515, #2a0505); }
-        .btn-friend-remove { background: linear-gradient(135deg, var(--scarlet), #4a0000); color: #e0a0a0; border: 1px solid #e0a0a0; }
-        .btn-friend-remove:hover { background: linear-gradient(135deg, #a01010, #6a0000); }
-        .btn-go-chat { background: linear-gradient(135deg, #2a1a4a, #150a2a); color: #b090d0; border: 1px solid #b090d0; }
-        .btn-go-chat:hover { background: linear-gradient(135deg, #3a2a5a, #251a3a); }
+        /* ── 右侧操作区 ── */
+        .user-header-actions {
+            flex-shrink: 0; text-align: right; padding-bottom: 8px;
+        }
+        .user-header-stats {
+            display: flex; gap: 16px; justify-content: flex-end;
+            margin-bottom: 10px; font-size: 0.8rem; color: #999;
+        }
+        .user-header-stats span { white-space: nowrap; }
+        .user-header-stats strong { color: #ddd; }
+        .user-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+        .btn-friend { padding: 7px 20px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; letter-spacing: 1px; transition: all 0.3s ease; font-family: inherit; border: none; white-space: nowrap; }
+        .btn-friend-add { background: var(--scarlet); color: #fff; }
+        .btn-friend-add:hover { background: #a01010; }
+        .btn-friend-pending { background: #333; color: #888; cursor: not-allowed; }
+        .btn-friend-accept { background: #2a5a2a; color: #8fbc8f; border: 1px solid #5a8a5a; }
+        .btn-friend-accept:hover { background: #3a6a3a; }
+        .btn-friend-decline { background: #3a1010; color: #cc6666; border: 1px solid #6a3030; }
+        .btn-friend-decline:hover { background: #4a1515; }
+        .btn-friend-remove { background: #4a2020; color: #cc8888; border: 1px solid #6a3030; }
+        .btn-friend-remove:hover { background: #5a2828; }
+        .btn-go-chat { background: #2a1a4a; color: #b090d0; border: 1px solid #5a3a7a; }
+        .btn-go-chat:hover { background: #3a2a5a; }
 
-        /* 编辑区（仅自己可见） */
-        .user-edit-section { max-width: 700px; margin: 0 auto 20px; }
-        .profile-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-dark, #3a1010); margin-bottom: 20px; }
-        .profile-tab {
-            flex: 1; text-align: center; padding: 12px; cursor: pointer;
+        /* ── 标签栏 ── */
+        .user-tab-bar {
+            display: flex; padding: 0 30px;
+            border-bottom: 1px solid var(--border-dark, #3a1010);
+            background: var(--bg-darkest);
+        }
+        .user-tab {
+            padding: 12px 24px; cursor: pointer; font-size: 0.9rem;
+            color: #999; border-bottom: 2px solid transparent;
+            margin-bottom: -1px; transition: all 0.2s; letter-spacing: 1px;
+        }
+        .user-tab:hover { color: #ddd; }
+        .user-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+        /* ===== 双栏主布局 ===== */
+        .user-main-layout { display: flex; gap: 24px; padding: 20px 0; }
+        .user-content { flex: 1; min-width: 0; }
+        .user-content-tabs { display: flex; gap: 0; margin-bottom: 16px; }
+        .user-content-tab {
+            padding: 8px 20px; cursor: pointer; font-size: 0.85rem;
             color: var(--text-muted); border-bottom: 2px solid transparent;
-            letter-spacing: 1px; font-size: 0.85rem; transition: all 0.3s;
+            transition: all 0.2s; letter-spacing: 1px;
         }
-        .profile-tab:hover { color: var(--text-light); }
-        .profile-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+        .user-content-tab:hover { color: #ddd; }
+        .user-content-tab.active { color: var(--gold); border-bottom-color: var(--scarlet); }
+        .user-content-panel { display: none; }
+        .user-content-panel.active { display: block; }
+
+        /* 侧边栏 */
+        .user-sidebar { width: 320px; flex-shrink: 0; }
+        .sidebar-card {
+            background: linear-gradient(180deg, #1a0d0d, #0f0808);
+            border: 1px solid #2a1010; border-radius: 8px;
+            padding: 20px; margin-bottom: 16px;
+        }
+        .sidebar-card-title {
+            font-size: 0.9rem; color: var(--gold); letter-spacing: 2px;
+            margin-bottom: 14px; padding-bottom: 10px;
+            border-bottom: 1px solid rgba(139,0,0,0.3);
+        }
+        .sidebar-row { display: flex; justify-content: space-between; padding: 8px 0; color: var(--text-light); font-size: 0.85rem; }
+        .sidebar-row-label { color: var(--text-muted); }
+        .sidebar-action-btn {
+            display: block; width: 100%; padding: 10px; text-align: center;
+            background: var(--scarlet); color: #fff; border: none; border-radius: 6px;
+            font-size: 0.9rem; cursor: pointer; letter-spacing: 1px; transition: all 0.3s;
+        }
+        .sidebar-action-btn:hover { background: #a01010; }
+
+        /* 编辑区（融入侧边栏） */
         .profile-panel { display: none; }
         .profile-panel.active { display: block; }
-        .profile-panel .form-group { margin-bottom: 20px; }
-        .profile-panel label { display: block; color: var(--gold); font-size: 0.85rem; letter-spacing: 2px; margin-bottom: 8px; }
+        .profile-panel .form-group { margin-bottom: 16px; }
+        .profile-panel label { display: block; color: var(--gold); font-size: 0.8rem; letter-spacing: 1px; margin-bottom: 6px; }
         .profile-panel input {
             width: 100%; background: var(--bg-dark, #0d0505); border: 1px solid var(--border-dark, #3a1010);
-            color: var(--text-light); padding: 12px 16px; font-size: 0.95rem; border-radius: 4px; transition: all 0.3s;
+            color: var(--text-light); padding: 10px 14px; font-size: 0.9rem; border-radius: 4px; transition: all 0.3s;
+            box-sizing: border-box;
         }
         .profile-panel input:focus { outline: none; border-color: var(--gold-dark, #b8960e); box-shadow: 0 0 12px rgba(212,175,55,0.15); }
         .profile-panel input[readonly] { opacity: 0.6; cursor: not-allowed; }
 
-        /* 文章列表 */
-        .user-posts-section { margin-top: 24px; }
-        .user-posts-header { font-size: 1.1rem; color: var(--gold); letter-spacing: 2px; padding-bottom: 12px; border-bottom: 1px solid #3a1010; margin-bottom: 16px; }
+        /* 文章卡片 */
         .user-post-card { background: linear-gradient(180deg, #1a0d0d, #0f0808); border: 1px solid #2a1010; border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; transition: border-color 0.3s; }
         .user-post-card:hover { border-color: var(--scarlet); }
         .user-post-title { font-size: 1.05rem; margin-bottom: 6px; }
@@ -130,6 +211,11 @@
         .user-post-meta { font-size: 0.75rem; color: #6a5050; margin-top: 8px; }
         .user-post-tag { display: inline-block; background: #1a0a0a; color: var(--scarlet-light); font-size: 0.7rem; padding: 2px 8px; border-radius: 8px; margin-right: 4px; border: 1px solid #3a1010; }
         .user-no-posts { text-align: center; color: var(--text-muted); padding: 30px; }
+
+        @media (max-width: 768px) {
+            .user-main-layout { flex-direction: column; }
+            .user-sidebar { width: 100%; }
+        }
         .hidden-file-input { display: none; }
 
         /* ===== 头像裁剪模态框 ===== */
@@ -152,10 +238,16 @@
         .crop-actions { justify-content: center; gap: 16px; }
 
         @media (max-width: 600px) {
-            .user-avatar-lg { width: 120px; height: 120px; }
-            .user-nickname-lg { font-size: 1.3rem; }
-            .user-stats { gap: 20px; }
-            .user-stat-num { font-size: 1.3rem; }
+            .user-cover { height: 180px; }
+            .user-info-bar { flex-direction: column; align-items: flex-start; padding: 0 16px 12px; margin-top: -48px; }
+            .user-avatar-lg { width: 96px; height: 96px; }
+            .user-avatar-wrap { margin-right: 0; margin-bottom: 8px; }
+            .user-nickname-lg { font-size: 1.2rem; }
+            .user-info-text { padding-bottom: 4px; }
+            .user-header-actions { text-align: left; padding-bottom: 0; }
+            .user-header-stats { justify-content: flex-start; gap: 12px; font-size: 0.75rem; margin-bottom: 6px; }
+            .user-tab-bar { padding: 0 12px; }
+            .user-tab { padding: 10px 14px; font-size: 0.8rem; }
             .crop-area-container { width: 240px; height: 240px; }
             .crop-mask { background: radial-gradient(circle 95px at center, transparent 95px, rgba(0,0,0,0.75) 96px); }
             .crop-circle { width: 190px; height: 190px; }
@@ -185,148 +277,191 @@
 
     <div class="main-container">
         <div class="content-area">
-            <%-- ===== Banner ===== --%>
-            <div class="user-banner">
-                <div class="user-avatar-wrap">
-                    <img class="user-avatar-lg<%= isOwnProfile ? " clickable" : "" %>"
-                         id="avatarPreview" src="<%= avatarSrc %>"
-                         alt="<%= HtmlUtil.escape(profileUser.getNickname()) %>"
-                         <%= isOwnProfile ? "onclick=\"document.getElementById('avatarFileInput').click()\" title=\"点击更换头像\"" : "" %>>
+            <%-- ===== Banner：全宽封面 + 头像左下角 + 信息右侧 ===== --%>
+            <div class="user-profile-header">
+                <div class="user-cover<%= isOwnProfile ? " clickable" : "" %>" id="userCover"
+                     style="<%= hasBg ? "background-image: url(" + backgroundSrc + ");" : "" %>"
+                     <%= isOwnProfile ? "onclick=\"document.getElementById('bgFileInput').click()\" title=\"点击更换背景图\"" : "" %>>
                     <% if (isOwnProfile) { %>
-                    <div class="avatar-edit-badge" onclick="document.getElementById('avatarFileInput').click()" title="更换头像">📷</div>
+                    <div class="banner-edit-badge" onclick="event.stopPropagation();document.getElementById('bgFileInput').click()" title="更换背景图">🖼️</div>
+                    <input type="file" class="hidden-file-input" id="bgFileInput" accept="image/jpeg,image/png,image/gif,image/webp" onchange="onBgFileSelected(event)">
                     <% } %>
                 </div>
-                <% if (isOwnProfile) { %>
-                <input type="file" class="hidden-file-input" id="avatarFileInput" accept="image/jpeg,image/png,image/gif,image/webp" onchange="onAvatarFileSelected(event)">
-                <% } %>
-                <div class="user-nickname-lg"><%= HtmlUtil.escape(profileUser.getNickname()) %></div>
-                <div class="user-username">@<%= HtmlUtil.escape(profileUser.getUsername()) %></div>
-                <div class="user-role-badge"><%= HtmlUtil.escape(profileUser.getRole()) %></div>
-                <div class="user-join-date">🕐 入馆于 <%= profileUser.getCreatedAt() != null ? new SimpleDateFormat("yyyy年MM月dd日").format(profileUser.getCreatedAt()) : "未知" %></div>
 
-                <div class="user-stats">
-                    <div class="user-stat-item"><div class="user-stat-num"><%= postCount %></div><div class="user-stat-label">📝 文章</div></div>
-                    <div class="user-stat-item"><div class="user-stat-num"><%= friendCount %></div><div class="user-stat-label">👥 友人</div></div>
-                    <div class="user-stat-item"><div class="user-stat-num"><%= commentCount %></div><div class="user-stat-label">💬 评论</div></div>
-                </div>
-
-                <% if (!isOwnProfile) { %>
-                <div class="user-actions" id="userActions">
-                    <% if ("none".equals(relationship)) { %>
-                        <button class="btn-friend btn-friend-add" onclick="sendFriendRequest()">✉️ 发送邀请函</button>
-                    <% } else if ("pending_sent".equals(relationship)) { %>
-                        <button class="btn-friend btn-friend-pending" disabled>📨 邀请函已发送</button>
-                    <% } else if ("pending_received".equals(relationship)) { %>
-                        <button class="btn-friend btn-friend-accept" onclick="acceptRequest()">✅ 接受邀请</button>
-                        <button class="btn-friend btn-friend-decline" onclick="rejectRequest()">❌ 婉拒</button>
-                    <% } else if ("friend".equals(relationship)) { %>
-                        <button class="btn-friend btn-go-chat" onclick="enterChat()">🍵 进入茶室</button>
-                        <button class="btn-friend btn-friend-remove" onclick="removeFriend()">💔 移除友人</button>
-                    <% } %>
-                </div>
-                <% } %>
-            </div>
-
-            <%-- ===== 自己的编辑面板 ===== --%>
-            <% if (isOwnProfile) { %>
-            <div class="user-edit-section">
-                <div class="profile-tabs">
-                    <div class="profile-tab active" onclick="switchTab('info')">📋 个人资料</div>
-                    <div class="profile-tab" onclick="switchTab('edit')">✏️ 编辑称呼</div>
-                    <div class="profile-tab" onclick="switchTab('password')">🔐 修改密语</div>
-                </div>
-
-                <div class="profile-panel active" id="panel-info">
-                    <div style="background: linear-gradient(180deg, #1a0d0d, #0f0808); border: 1px solid #2a1010; border-radius: 8px; padding: 20px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px dotted rgba(139,0,0,0.2);">
-                            <span style="color:var(--text-muted);">📛 名札</span>
-                            <span style="color:var(--text-light);"><%= HtmlUtil.escape(profileUser.getUsername()) %></span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px dotted rgba(139,0,0,0.2);">
-                            <span style="color:var(--text-muted);">🎭 称呼</span>
-                            <span style="color:var(--text-light);"><%= HtmlUtil.escape(profileUser.getNickname()) %></span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px dotted rgba(139,0,0,0.2);">
-                            <span style="color:var(--text-muted);">⚜️ 身份</span>
-                            <span style="color:var(--text-light);"><%= HtmlUtil.escape(profileUser.getRole()) %></span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;">
-                            <span style="color:var(--text-muted);">📅 入馆日期</span>
-                            <span style="color:var(--text-light);"><%= profileUser.getCreatedAt() != null ? new SimpleDateFormat("yyyy年MM月dd日").format(profileUser.getCreatedAt()) : "未知" %></span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="profile-panel" id="panel-edit">
-                    <form onsubmit="saveProfile(event)" style="background: linear-gradient(180deg, #1a0d0d, #0f0808); border: 1px solid #2a1010; border-radius: 8px; padding: 20px;">
-                        <div class="form-group">
-                            <label>📛 名札（不可修改）</label>
-                            <input type="text" value="<%= HtmlUtil.escape(profileUser.getUsername()) %>" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label>🎭 称呼</label>
-                            <input type="text" id="editNickname" value="<%= HtmlUtil.escape(profileUser.getNickname()) %>" maxlength="50" required>
-                        </div>
-                        <div class="form-actions" style="text-align:right;">
-                            <button type="submit" class="btn-scarlet">💾 保存称呼</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="profile-panel" id="panel-password">
-                    <form onsubmit="changePassword(event)" style="background: linear-gradient(180deg, #1a0d0d, #0f0808); border: 1px solid #2a1010; border-radius: 8px; padding: 20px;">
-                        <div class="form-group">
-                            <label>🔐 当前封印密语</label>
-                            <input type="password" id="oldPassword" placeholder="输入当前密码" required>
-                        </div>
-                        <div class="form-group">
-                            <label>🔑 新的封印密语</label>
-                            <input type="password" id="newPassword" placeholder="至少4位" minlength="4" required>
-                        </div>
-                        <div class="form-group">
-                            <label>🔑 确认封印密语</label>
-                            <input type="password" id="confirmPassword" placeholder="再次输入新密码" minlength="4" required>
-                        </div>
-                        <div class="form-actions" style="text-align:right;">
-                            <button type="submit" class="btn-scarlet">🔐 更新密语</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <% } %>
-
-            <%-- ===== 最近文章 ===== --%>
-            <div class="user-posts-section">
-                <div class="user-posts-header"><%= isOwnProfile ? "📝 我的文章" : "📝 最近文章" %></div>
-                <% if (recentPosts != null && !recentPosts.isEmpty()) {
-                    for (Post p : recentPosts) {
-                        String excerpt = p.getExcerpt();
-                        if (excerpt == null || excerpt.isEmpty()) {
-                            String content = p.getContent();
-                            excerpt = content != null ? content.replaceAll("<[^>]*>", "") : "";
-                            if (excerpt.length() > 150) excerpt = excerpt.substring(0, 150) + "...";
-                        }
-                %>
-                <div class="user-post-card">
-                    <div class="user-post-title"><a href="<%=ctxPath%>/blog/post?id=<%=p.getId()%>"><%= HtmlUtil.escape(p.getTitle()) %></a></div>
-                    <div class="user-post-excerpt"><%= HtmlUtil.escape(excerpt) %></div>
-                    <div class="user-post-meta">
-                        <span>🕐 <%= p.getCreatedAt() != null ? new SimpleDateFormat("yyyy-MM-dd").format(p.getCreatedAt()) : "" %></span>
-                        <span style="margin-left:10px;">👁️ <%= p.getViewCount() %></span>
-                        <% if (p.getCategoryName() != null && !p.getCategoryName().isEmpty()) { %>
-                        <span style="margin-left:10px;"><%= HtmlUtil.escape(p.getCategoryIcon() != null ? p.getCategoryIcon() : "📜") %> <%= HtmlUtil.escape(p.getCategoryName()) %></span>
+                <div class="user-info-bar">
+                    <%-- 头像 → 左下角重叠 cover --%>
+                    <div class="user-avatar-wrap">
+                        <img class="user-avatar-lg<%= isOwnProfile ? " clickable" : "" %>"
+                             id="avatarPreview" src="<%= avatarSrc %>"
+                             alt="<%= HtmlUtil.escape(profileUser.getNickname()) %>"
+                             <%= isOwnProfile ? "onclick=\"document.getElementById('avatarFileInput').click()\" title=\"点击更换头像\"" : "" %>>
+                        <% if (isOwnProfile) { %>
+                        <div class="avatar-edit-badge" onclick="document.getElementById('avatarFileInput').click()" title="更换头像">📷</div>
                         <% } %>
                     </div>
-                    <% if (p.getTags() != null && !p.getTags().isEmpty()) {
-                        for (String tag : p.getTags().split(",")) { %>
-                        <span class="user-post-tag"><%= HtmlUtil.escape(tag.trim()) %></span>
-                    <%  }
-                       } %>
+                    <% if (isOwnProfile) { %>
+                    <input type="file" class="hidden-file-input" id="avatarFileInput" accept="image/jpeg,image/png,image/gif,image/webp" onchange="onAvatarFileSelected(event)">
+                    <% } %>
+
+                    <%-- 昵称 + 副信息 --%>
+                    <div class="user-info-text">
+                        <div class="user-nickname-lg"><%= HtmlUtil.escape(profileUser.getNickname()) %></div>
+                        <div class="user-info-sub">
+                            <span class="user-username">@<%= HtmlUtil.escape(profileUser.getUsername()) %></span>
+                            <span class="user-role-badge"><%= HtmlUtil.escape(profileUser.getRole()) %></span>
+                            <span class="user-join-date">🕐 <%= profileUser.getCreatedAt() != null ? new SimpleDateFormat("yyyy年MM月dd日").format(profileUser.getCreatedAt()) : "未知" %></span>
+                        </div>
+                    </div>
+
+                    <%-- 右侧：统计 + 操作按钮 --%>
+                    <div class="user-header-actions">
+                        <div class="user-header-stats">
+                            <span><strong><%= postCount %></strong> 文章</span>
+                            <span><strong><%= friendCount %></strong> 友人</span>
+                            <span><strong><%= commentCount %></strong> 评论</span>
+                        </div>
+                        <% if (!isOwnProfile) { %>
+                        <div class="user-actions" id="userActions">
+                            <% if ("none".equals(relationship)) { %>
+                                <button class="btn-friend btn-friend-add" onclick="sendFriendRequest()">✉️ 发送邀请函</button>
+                            <% } else if ("pending_sent".equals(relationship)) { %>
+                                <button class="btn-friend btn-friend-pending" disabled>📨 邀请函已发送</button>
+                            <% } else if ("pending_received".equals(relationship)) { %>
+                                <button class="btn-friend btn-friend-accept" onclick="acceptRequest()">✅ 接受</button>
+                                <button class="btn-friend btn-friend-decline" onclick="rejectRequest()">❌ 婉拒</button>
+                            <% } else if ("friend".equals(relationship)) { %>
+                                <button class="btn-friend btn-go-chat" onclick="enterChat()">🍵 进入茶室</button>
+                                <button class="btn-friend btn-friend-remove" onclick="removeFriend()">💔 移除</button>
+                            <% } %>
+                        </div>
+                        <% } else { %>
+                        <div class="user-actions">
+                            <a href="<%=ctxPath%>/blog/admin" class="btn-friend btn-go-chat" style="text-decoration:none;display:inline-block;">⚙️ 管理室</a>
+                        </div>
+                        <% } %>
+                    </div>
                 </div>
-                <%     }
-                   } else { %>
-                <div class="user-no-posts"><div style="font-size:2rem;">📜</div><p>暂无文章</p></div>
-                <% } %>
+
+                <%-- 标签栏 --%>
+                <div class="user-tab-bar">
+                    <div class="user-tab active" onclick="switchContentTab('posts')">📝 文章</div>
+                    <div class="user-tab" onclick="switchContentTab('about')">📋 关于</div>
+                </div>
+            </div>
+
+            <%-- ===== 双栏主体 ===== --%>
+            <div class="user-main-layout">
+                <%-- 左栏：内容区 --%>
+                <div class="user-content">
+                    <div class="user-content-tabs">
+                        <div class="user-content-tab active" onclick="switchContentTab('posts')">📝 文章</div>
+                        <div class="user-content-tab" onclick="switchContentTab('about')">📋 关于</div>
+                    </div>
+
+                    <%-- 文章面板 --%>
+                    <div class="user-content-panel active" id="content-posts">
+                        <% if (recentPosts != null && !recentPosts.isEmpty()) {
+                            for (Post p : recentPosts) {
+                                String excerpt = p.getExcerpt();
+                                if (excerpt == null || excerpt.isEmpty()) {
+                                    String content = p.getContent();
+                                    excerpt = content != null ? content.replaceAll("<[^>]*>", "") : "";
+                                    if (excerpt.length() > 150) excerpt = excerpt.substring(0, 150) + "...";
+                                }
+                        %>
+                        <div class="user-post-card">
+                            <div class="user-post-title"><a href="<%=ctxPath%>/blog/post?id=<%=p.getId()%>"><%= HtmlUtil.escape(p.getTitle()) %></a></div>
+                            <div class="user-post-excerpt"><%= HtmlUtil.escape(excerpt) %></div>
+                            <div class="user-post-meta">
+                                <span>🕐 <%= p.getCreatedAt() != null ? new SimpleDateFormat("yyyy-MM-dd").format(p.getCreatedAt()) : "" %></span>
+                                <span style="margin-left:10px;">👁️ <%= p.getViewCount() %></span>
+                                <% if (p.getCategoryName() != null && !p.getCategoryName().isEmpty()) { %>
+                                <span style="margin-left:10px;"><%= HtmlUtil.escape(p.getCategoryIcon() != null ? p.getCategoryIcon() : "📜") %> <%= HtmlUtil.escape(p.getCategoryName()) %></span>
+                                <% } %>
+                            </div>
+                            <% if (p.getTags() != null && !p.getTags().isEmpty()) {
+                                for (String tag : p.getTags().split(",")) { %>
+                            <span class="user-post-tag"><%= HtmlUtil.escape(tag.trim()) %></span>
+                            <%  }
+                               } %>
+                        </div>
+                        <%     }
+                           } else { %>
+                        <div class="user-no-posts"><div style="font-size:2rem;">📜</div><p>暂无文章</p></div>
+                        <% } %>
+                    </div>
+
+                    <%-- 关于面板 --%>
+                    <div class="user-content-panel" id="content-about">
+                        <div class="sidebar-card">
+                            <div class="sidebar-card-title">📋 个人资料</div>
+                            <div class="sidebar-row"><span class="sidebar-row-label">📛 名札</span><span><%= HtmlUtil.escape(profileUser.getUsername()) %></span></div>
+                            <div class="sidebar-row"><span class="sidebar-row-label">🎭 称呼</span><span><%= HtmlUtil.escape(profileUser.getNickname()) %></span></div>
+                            <div class="sidebar-row"><span class="sidebar-row-label">⚜️ 身份</span><span><%= HtmlUtil.escape(profileUser.getRole()) %></span></div>
+                            <div class="sidebar-row"><span class="sidebar-row-label">📅 入馆</span><span><%= profileUser.getCreatedAt() != null ? new SimpleDateFormat("yyyy年MM月dd日").format(profileUser.getCreatedAt()) : "未知" %></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <%-- 右栏：侧边栏 --%>
+                <div class="user-sidebar">
+                    <%-- 统计卡片 --%>
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-title">📊 数据统计</div>
+                        <div class="sidebar-row"><span class="sidebar-row-label">📝 文章</span><span><strong><%= postCount %></strong></span></div>
+                        <div class="sidebar-row"><span class="sidebar-row-label">👥 友人</span><span><strong><%= friendCount %></strong></span></div>
+                        <div class="sidebar-row"><span class="sidebar-row-label">💬 评论</span><span><strong><%= commentCount %></strong></span></div>
+                    </div>
+
+                    <%-- 自己可见：编辑面板 --%>
+                    <% if (isOwnProfile) { %>
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-title">✏️ 编辑资料</div>
+                        <div class="profile-panel active" id="panel-edit">
+                            <form onsubmit="saveProfile(event)">
+                                <div class="form-group">
+                                    <label>🎭 称呼</label>
+                                    <input type="text" id="editNickname" value="<%= HtmlUtil.escape(profileUser.getNickname()) %>" maxlength="50" required>
+                                </div>
+                                <div style="text-align:right;">
+                                    <button type="submit" class="sidebar-action-btn">💾 保存</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="profile-panel" id="panel-password">
+                            <form onsubmit="changePassword(event)">
+                                <div class="form-group">
+                                    <label>🔐 当前密语</label>
+                                    <input type="password" id="oldPassword" placeholder="输入当前密码" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>🔑 新密语</label>
+                                    <input type="password" id="newPassword" placeholder="至少4位" minlength="4" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>🔑 确认密语</label>
+                                    <input type="password" id="confirmPassword" placeholder="再次输入新密码" minlength="4" required>
+                                </div>
+                                <div style="text-align:right;">
+                                    <button type="submit" class="sidebar-action-btn">🔐 更新密语</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button class="sidebar-action-btn" style="flex:1;background:transparent;border:1px solid var(--border-dark);color:var(--text-muted);" onclick="switchEditTab('edit')">✏️ 称呼</button>
+                            <button class="sidebar-action-btn" style="flex:1;background:transparent;border:1px solid var(--border-dark);color:var(--text-muted);" onclick="switchEditTab('password')">🔐 密语</button>
+                        </div>
+                    </div>
+                    <% } %>
+
+                    <%-- 访客可见：快捷操作 --%>
+                    <% if (!isOwnProfile) { %>
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-title">🔗 快捷操作</div>
+                        <a href="<%=ctxPath%>/blog" class="sidebar-action-btn" style="text-decoration:none;display:block;background:transparent;border:1px solid var(--gold);color:var(--gold);">🏠 返回大厅</a>
+                    </div>
+                    <% } %>
+                </div>
             </div>
         </div>
     </div>
@@ -375,6 +510,41 @@
     </div>
     <% } %>
 
+    <%-- ===== 背景图裁剪模态框 ===== --%>
+    <% if (isOwnProfile) { %>
+    <div class="modal-overlay" id="bgCropModal" onclick="if(event.target===this)closeBgCropModal()">
+        <div class="modal-dialog bg-crop-modal-dialog">
+            <div class="modal-header">
+                <h3>🖼️ 裁剪背景图</h3>
+                <button class="modal-close" onclick="closeBgCropModal()">✕</button>
+            </div>
+            <div class="modal-body bg-crop-modal-body">
+                <div class="bg-crop-workspace">
+                    <div class="bg-crop-area-container" id="bgCropAreaContainer">
+                        <div class="bg-crop-rect"></div>
+                        <img class="bg-crop-image" id="bgCropImage" alt="背景裁剪预览" draggable="false">
+                    </div>
+                    <div class="bg-crop-preview-section">
+                        <p class="crop-preview-label">预览</p>
+                        <div class="bg-crop-preview-rect">
+                            <canvas id="bgCropPreviewCanvas" width="240" height="80"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="crop-controls">
+                    <span class="crop-zoom-icon">🔍−</span>
+                    <input type="range" class="crop-zoom-slider" id="bgZoomSlider" min="50" max="300" value="100" step="1">
+                    <span class="crop-zoom-icon">🔍+</span>
+                </div>
+                <div class="form-actions crop-actions">
+                    <button type="button" class="btn-scarlet-outline" onclick="closeBgCropModal()">取消</button>
+                    <button type="button" class="btn-scarlet" id="btnBgCropConfirm" onclick="confirmBgCrop()">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
     <script>
         var CTX_PATH = '<%=ctxPath%>';
     </script>
@@ -383,17 +553,25 @@
     <% if (isOwnProfile) { %>
     <script src="<%=ctxPath%>/js/api.js?v=20260616"></script>
     <script>
-        function switchTab(tab) {
-            document.querySelectorAll('.profile-tab').forEach(function(t) {
-                t.classList.toggle('active',
-                    (tab === 'info' && t.textContent.includes('个人资料')) ||
-                    (tab === 'edit' && t.textContent.includes('编辑称呼')) ||
-                    (tab === 'password' && t.textContent.includes('修改密语'))
-                );
-            });
+        function switchContentTab(tab) {
+            // 内容区 tab
+            document.querySelectorAll('.user-content-tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.user-content-panel').forEach(function(p) { p.classList.remove('active'); });
+            // 头部标签栏
+            document.querySelectorAll('.user-tab').forEach(function(t) { t.classList.remove('active'); });
+            if (tab === 'posts') {
+                document.querySelectorAll('.user-content-tab')[0].classList.add('active');
+                document.getElementById('content-posts').classList.add('active');
+                document.querySelectorAll('.user-tab')[0].classList.add('active');
+            } else if (tab === 'about') {
+                document.querySelectorAll('.user-content-tab')[1].classList.add('active');
+                document.getElementById('content-about').classList.add('active');
+                document.querySelectorAll('.user-tab')[1].classList.add('active');
+            }
+        }
+        function switchEditTab(tab) {
             document.querySelectorAll('.profile-panel').forEach(function(p) { p.classList.remove('active'); });
-            var el = document.getElementById('panel-' + tab);
-            if (el) el.classList.add('active');
+            document.getElementById('panel-' + tab).classList.add('active');
         }
 
         // === 头像裁剪 ===
@@ -514,6 +692,169 @@
             xhr.onload=function(){try{var r=JSON.parse(xhr.responseText);if(r.success){showToast('密语已更新！🔐','success');document.getElementById('oldPassword').value='';document.getElementById('newPassword').value='';document.getElementById('confirmPassword').value='';}else{showToast(r.error||'修改失败','error');}}catch(ex){showToast('修改失败','error');}};
             xhr.send(body);
         }
+
+        // === 背景图裁剪 ===
+        var bgCropState = { image: null, scale: 1.0, offsetX: 0, offsetY: 0, dragging: false, dragStartX: 0, dragStartY: 0, dragStartOffsetX: 0, dragStartOffsetY: 0 };
+        var BG_CROP_W = 750, BG_CROP_H = 250, BG_RECT_W = 720, BG_RECT_H = 240, BG_OUTPUT_W = 1200, BG_OUTPUT_H = 400;
+
+        function onBgFileSelected(e) {
+            var f = e.target.files[0];
+            if (!f) return;
+            if (!/^image\/(jpeg|png|gif|webp)$/.test(f.type)) { showToast('仅支持 JPG/PNG/GIF/WebP', 'error'); e.target.value = ''; return; }
+            if (f.size > 5*1024*1024) { showToast('文件不能超过 5MB', 'error'); e.target.value = ''; return; }
+            var r = new FileReader();
+            r.onload = function(ev) { var img = new Image(); img.onload = function() { openBgCropModal(img); }; img.src = ev.target.result; };
+            r.readAsDataURL(f);
+        }
+
+        function openBgCropModal(img) {
+            if (window.innerWidth <= 600) { BG_CROP_W = 300; BG_CROP_H = 100; BG_RECT_W = 285; BG_RECT_H = 95; }
+            else { BG_CROP_W = 750; BG_CROP_H = 250; BG_RECT_W = 720; BG_RECT_H = 240; }
+            var con = document.getElementById('bgCropAreaContainer');
+            con.style.width = BG_CROP_W + 'px'; con.style.height = BG_CROP_H + 'px';
+            var rect = con.querySelector('.bg-crop-rect');
+            rect.style.width = BG_RECT_W + 'px'; rect.style.height = BG_RECT_H + 'px';
+            bgCropState.image = img; bgCropState.scale = 1.0;
+            var sW = BG_RECT_W / img.naturalWidth, sH = BG_RECT_H / img.naturalHeight;
+            bgCropState.scale = Math.max(sW, sH);
+            if (bgCropState.scale < 0.4) bgCropState.scale = 0.5;
+            document.getElementById('bgZoomSlider').value = Math.round(bgCropState.scale * 100);
+            var sw = img.naturalWidth * bgCropState.scale, sh = img.naturalHeight * bgCropState.scale;
+            bgCropState.offsetX = (BG_CROP_W - sw) / 2;
+            bgCropState.offsetY = (BG_CROP_H - sh) / 2;
+            applyBgTransform();
+            document.getElementById('bgCropModal').classList.add('active');
+            renderBgPreview();
+        }
+
+        function closeBgCropModal() {
+            document.getElementById('bgCropModal').classList.remove('active');
+            document.getElementById('bgFileInput').value = '';
+            bgCropState.image = null;
+        }
+
+        function applyBgTransform() {
+            var el = document.getElementById('bgCropImage');
+            el.src = bgCropState.image.src;
+            var sw = bgCropState.image.naturalWidth * bgCropState.scale;
+            var sh = bgCropState.image.naturalHeight * bgCropState.scale;
+            el.style.left = bgCropState.offsetX + 'px';
+            el.style.top = bgCropState.offsetY + 'px';
+            el.style.width = sw + 'px';
+            el.style.height = sh + 'px';
+        }
+
+        function clampBgPosition() {
+            var sw = bgCropState.image.naturalWidth * bgCropState.scale;
+            var sh = bgCropState.image.naturalHeight * bgCropState.scale;
+            var cx = BG_CROP_W / 2, cy = BG_CROP_H / 2;
+            if (sw < BG_RECT_W) bgCropState.offsetX = cx - sw / 2;
+            else bgCropState.offsetX = Math.max(cx - sw + BG_RECT_W / 2, Math.min(cx - BG_RECT_W / 2, bgCropState.offsetX));
+            if (sh < BG_RECT_H) bgCropState.offsetY = cy - sh / 2;
+            else bgCropState.offsetY = Math.max(cy - sh + BG_RECT_H / 2, Math.min(cy - BG_RECT_H / 2, bgCropState.offsetY));
+        }
+
+        function bgZoomAtCenter(newScale) {
+            var cx = BG_CROP_W / 2, cy = BG_CROP_H / 2;
+            var natX = (cx - bgCropState.offsetX) / bgCropState.scale;
+            var natY = (cy - bgCropState.offsetY) / bgCropState.scale;
+            bgCropState.scale = newScale;
+            bgCropState.offsetX = cx - natX * newScale;
+            bgCropState.offsetY = cy - natY * newScale;
+            clampBgPosition(); applyBgTransform(); renderBgPreview();
+        }
+
+        function renderBgPreview() {
+            if (!bgCropState.image) return;
+            var c = document.getElementById('bgCropPreviewCanvas'), ctx = c.getContext('2d');
+            var pw = 240, ph = 80;
+            ctx.clearRect(0, 0, pw, ph);
+            var cx = BG_CROP_W / 2, cy = BG_CROP_H / 2;
+            var sx = (cx - BG_RECT_W / 2 - bgCropState.offsetX) / bgCropState.scale;
+            var sy = (cy - BG_RECT_H / 2 - bgCropState.offsetY) / bgCropState.scale;
+            var sw = BG_RECT_W / bgCropState.scale, sh = BG_RECT_H / bgCropState.scale;
+            var csx = Math.max(0, sx), csy = Math.max(0, sy);
+            var csw = Math.min(sw, bgCropState.image.naturalWidth - csx);
+            var csh = Math.min(sh, bgCropState.image.naturalHeight - csy);
+            if (csw <= 0 || csh <= 0) { ctx.fillStyle = '#1a0000'; ctx.fillRect(0, 0, pw, ph); return; }
+            ctx.drawImage(bgCropState.image, csx, csy, csw, csh,
+                (csx - sx) / sw * pw, (csy - sy) / sh * ph,
+                csw / sw * pw, csh / sh * ph);
+        }
+
+        function confirmBgCrop() {
+            if (!bgCropState.image) return;
+            var btn = document.getElementById('btnBgCropConfirm');
+            btn.classList.add('loading'); btn.textContent = '处理中...';
+            var c = document.createElement('canvas');
+            c.width = BG_OUTPUT_W; c.height = BG_OUTPUT_H;
+            var ctx = c.getContext('2d');
+            var cx = BG_CROP_W / 2, cy = BG_CROP_H / 2, s = bgCropState.scale;
+            var sx = (cx - BG_RECT_W / 2 - bgCropState.offsetX) / s;
+            var sy = (cy - BG_RECT_H / 2 - bgCropState.offsetY) / s;
+            var sw = BG_RECT_W / s, sh = BG_RECT_H / s;
+            var csx = Math.max(0, sx), csy = Math.max(0, sy);
+            var csw = Math.min(sw, bgCropState.image.naturalWidth - csx);
+            var csh = Math.min(sh, bgCropState.image.naturalHeight - csy);
+            ctx.fillStyle = '#1a0000'; ctx.fillRect(0, 0, BG_OUTPUT_W, BG_OUTPUT_H);
+            ctx.drawImage(bgCropState.image, csx, csy, csw, csh,
+                (csx - sx) / sw * BG_OUTPUT_W, (csy - sy) / sh * BG_OUTPUT_H,
+                csw / sw * BG_OUTPUT_W, csh / sh * BG_OUTPUT_H);
+            var cover = document.getElementById('userCover');
+            if (cover) {
+                cover.style.backgroundImage = 'url(' + c.toDataURL('image/jpeg', 0.9) + ')';
+                cover.style.backgroundSize = 'cover';
+                cover.style.backgroundPosition = 'center';
+            }
+            c.toBlob(function(b) {
+                if (!b) { showToast('图片处理失败', 'error'); btn.classList.remove('loading'); btn.textContent = '确认'; return; }
+                var fd = new FormData(); fd.append('background', b, 'background.jpg');
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', CTX_PATH + '/api/auth/profile', true);
+                xhr.onload = function() {
+                    try {
+                        var r = JSON.parse(xhr.responseText);
+                        if (r.success) { showToast('背景图已更新！🖼️', 'success'); setTimeout(function() { location.reload(); }, 1000); }
+                        else { showToast(r.error || '上传失败', 'error'); }
+                    } catch(ex) { showToast('上传失败', 'error'); }
+                };
+                xhr.send(fd); closeBgCropModal(); btn.classList.remove('loading'); btn.textContent = '确认';
+            }, 'image/jpeg', 0.9);
+        }
+
+        // 背景裁剪拖拽/缩放事件
+        (function() {
+            var bgCon = document.getElementById('bgCropAreaContainer');
+            var bgSl = document.getElementById('bgZoomSlider');
+            bgCon.addEventListener('mousedown', function(e) {
+                if (!bgCropState.image) return; e.preventDefault();
+                bgCropState.dragging = true; bgCropState.dragStartX = e.clientX; bgCropState.dragStartY = e.clientY;
+                bgCropState.dragStartOffsetX = bgCropState.offsetX; bgCropState.dragStartOffsetY = bgCropState.offsetY;
+            });
+            window.addEventListener('mousemove', function(e) {
+                if (!bgCropState.dragging) return;
+                bgCropState.offsetX = bgCropState.dragStartOffsetX + (e.clientX - bgCropState.dragStartX);
+                bgCropState.offsetY = bgCropState.dragStartOffsetY + (e.clientY - bgCropState.dragStartY);
+                clampBgPosition(); applyBgTransform(); renderBgPreview();
+            });
+            window.addEventListener('mouseup', function() { bgCropState.dragging = false; });
+            bgCon.addEventListener('touchstart', function(e) {
+                if (!bgCropState.image || e.touches.length !== 1) return;
+                bgCropState.dragging = true; bgCropState.dragStartX = e.touches[0].clientX; bgCropState.dragStartY = e.touches[0].clientY;
+                bgCropState.dragStartOffsetX = bgCropState.offsetX; bgCropState.dragStartOffsetY = bgCropState.offsetY;
+            });
+            window.addEventListener('touchmove', function(e) {
+                if (!bgCropState.dragging || e.touches.length !== 1) return;
+                bgCropState.offsetX = bgCropState.dragStartOffsetX + (e.touches[0].clientX - bgCropState.dragStartX);
+                bgCropState.offsetY = bgCropState.dragStartOffsetY + (e.touches[0].clientY - bgCropState.dragStartY);
+                clampBgPosition(); applyBgTransform(); renderBgPreview();
+            });
+            window.addEventListener('touchend', function() { bgCropState.dragging = false; });
+            bgSl.addEventListener('input', function() {
+                if (!bgCropState.image) return;
+                bgZoomAtCenter(parseInt(this.value) / 100);
+            });
+        })();
     </script>
     <% } %>
 

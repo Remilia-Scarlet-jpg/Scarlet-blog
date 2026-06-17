@@ -90,7 +90,7 @@ public class BlogServlet extends HttpServlet {
                 handleStatsAPI(req, resp);
             } else if (path.equals("/api/health")) {
                 handleHealth(req, resp);
-            } else if (path.equals("/api/admin/users")) {
+            } else if (path.startsWith("/api/admin/users")) {
                 handleAdminUsers(req, resp);
             } else if (path.startsWith("/api/admin/carousel")) {
                 handleCarouselAPI(req, resp);
@@ -382,6 +382,7 @@ public class BlogServlet extends HttpServlet {
 
             String nickname = req.getParameter("nickname");
             String avatar = null;
+            String background = null;
 
             // 处理头像文件上传
             Part filePart = null;
@@ -406,10 +407,31 @@ public class BlogServlet extends HttpServlet {
                 avatar = "data:" + mime + ";base64," + java.util.Base64.getEncoder().encodeToString(baos.toByteArray());
             }
 
-            boolean ok = userDAO.updateProfile(user.getId(), nickname, avatar);
+            // 处理背景图上传
+            Part bgPart = null;
+            try { bgPart = req.getPart("background"); } catch (Exception e) {}
+            if (bgPart != null && bgPart.getSize() > 0) {
+                String bgName = getSubmittedFileName(bgPart);
+                String bgExt = bgName.contains(".") ? bgName.substring(bgName.lastIndexOf(".")).toLowerCase() : ".jpg";
+                if (!bgExt.matches("\\.(jpg|jpeg|png|gif|webp)$")) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"背景图仅支持 JPG/PNG/GIF/WebP 格式。\"}");
+                    return;
+                }
+                String bgMime = bgExt.equals(".webp") ? "image/webp" : bgExt.equals(".gif") ? "image/gif" :
+                    bgExt.equals(".png") ? "image/png" : "image/jpeg";
+                java.io.ByteArrayOutputStream bgBaos = new java.io.ByteArrayOutputStream();
+                try (InputStream is = bgPart.getInputStream()) {
+                    byte[] b = new byte[8192]; int n;
+                    while ((n = is.read(b)) != -1) bgBaos.write(b, 0, n);
+                }
+                background = "data:" + bgMime + ";base64," + java.util.Base64.getEncoder().encodeToString(bgBaos.toByteArray());
+            }
+
+            boolean ok = userDAO.updateProfile(user.getId(), nickname, avatar, background);
             if (ok) {
                 // 刷新 session 中的用户信息
                 if (avatar != null) user.setAvatar(avatar);
+                if (background != null) user.setBackground(background);
                 if (nickname != null) user.setNickname(nickname);
                 req.getSession().setAttribute("user", user);
                 resp.getWriter().write(toUserJson(user));
@@ -757,7 +779,7 @@ public class BlogServlet extends HttpServlet {
         resp.getWriter().write(sb.toString());
     }
 
-    /** 管理员查看用户列表 */
+    /** 管理员：用户列表 + 任命管理员 */
     private void handleAdminUsers(HttpServletRequest req, HttpServletResponse resp)
             throws Exception {
         resp.setContentType("application/json;charset=UTF-8");
@@ -770,6 +792,49 @@ public class BlogServlet extends HttpServlet {
             resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主或女仆长可查看。\"}");
             return;
         }
+
+        String path = req.getRequestURI().substring(req.getContextPath().length());
+        String method = req.getMethod();
+
+        // PUT /api/admin/users/:id/role — 任命/解除管理员（仅馆主）
+        if (path.matches("/api/admin/users/\\d+/role") && "PUT".equals(method)) {
+            String[] parts = path.split("/");
+            int targetId = Integer.parseInt(parts[parts.length - 2]);
+
+            if (!"馆主".equals(currentUser.getRole())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"仅馆主大人可以任命管理员。\"}");
+                return;
+            }
+            if (targetId == currentUser.getId()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"不能更改自己的身份哦~\"}");
+                return;
+            }
+            User targetUser = userDAO.findById(targetId);
+            if (targetUser == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"该住人不存在。\"}");
+                return;
+            }
+            String newRole = req.getParameter("role");
+            if (!"女仆长".equals(newRole) && !"住人".equals(newRole)) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"无效的身份。仅可任命为女仆长或降为住人。\"}");
+                return;
+            }
+            if (newRole.equals(targetUser.getRole())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"该住人已经是" + newRole + "了。\"}");
+                return;
+            }
+            boolean ok = userDAO.updateRole(targetId, newRole);
+            String nick = targetUser.getNickname() != null ? targetUser.getNickname() : targetUser.getUsername();
+            if (ok) {
+                resp.getWriter().write("{\"success\":true,\"message\":\"" + nick
+                    + ("女仆长".equals(newRole) ? " 已任命为女仆长！" : " 已降为住人。") + "\"}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"任命失败，请稍后再试。\"}");
+            }
+            return;
+        }
+
+        // GET /api/admin/users — 用户列表
         List<User> users = userDAO.getAllUsers();
         StringBuilder sb = new StringBuilder("{\"success\":true,\"data\":[");
         for (int i = 0; i < users.size(); i++) {
@@ -780,6 +845,7 @@ public class BlogServlet extends HttpServlet {
             sb.append(",\"nickname\":\"").append(escapeJson(u.getNickname())).append("\"");
             sb.append(",\"role\":\"").append(escapeJson(u.getRole())).append("\"");
             sb.append(",\"avatar\":").append(u.getAvatar() != null ? "\"" + escapeJson(u.getAvatar()) + "\"" : "null");
+            sb.append(",\"background\":").append(u.getBackground() != null ? "\"" + escapeJson(u.getBackground()) + "\"" : "null");
             sb.append(",\"createdAt\":\"").append(u.getCreatedAt() != null ? u.getCreatedAt().toString() : "").append("\"");
             sb.append("}");
         }
@@ -848,6 +914,9 @@ public class BlogServlet extends HttpServlet {
                 // 更新路径
                 s.setId(id); s.setImagePath(imagePath);
                 carouselDAO.update(s);
+                // 处理封面图上传
+                savePosterFile(req, s);
+                if (s.getPoster() != null) carouselDAO.update(s);
                 resp.getWriter().write("{\"success\":true,\"message\":\"幻灯片已添加！\",\"data\":" + toCarouselJson(carouselDAO.getById(id), req.getContextPath()) + "}");
                 return;
             } else if ("video".equals(type)) {
@@ -873,12 +942,18 @@ public class BlogServlet extends HttpServlet {
                     Files.copy(videoPart.getInputStream(), Paths.get(req.getServletContext().getRealPath("/"), vpath), StandardCopyOption.REPLACE_EXISTING);
                     s.setId(id); s.setImagePath(vpath); // 本地视频路径存在 image_path 字段
                     carouselDAO.update(s);
+                    // 处理封面图上传
+                    savePosterFile(req, s);
+                    if (s.getPoster() != null) carouselDAO.update(s);
                     resp.getWriter().write("{\"success\":true,\"message\":\"本地视频已添加！\",\"data\":" + toCarouselJson(carouselDAO.getById(id), req.getContextPath()) + "}");
                     return;
                 }
                 CarouselSlide s = new CarouselSlide();
                 s.setType("video"); s.setTitle(title); s.setVideoUrl(videoUrl.trim());
                 int id = carouselDAO.create(s);
+                s.setId(id);
+                savePosterFile(req, s);
+                if (s.getPoster() != null) carouselDAO.update(s);
                 resp.getWriter().write("{\"success\":true,\"message\":\"视频幻灯片已添加！\",\"data\":" + toCarouselJson(carouselDAO.getById(id), req.getContextPath()) + "}");
                 return;
             }
@@ -931,6 +1006,27 @@ public class BlogServlet extends HttpServlet {
                 Files.copy(videoPart.getInputStream(), Paths.get(req.getServletContext().getRealPath("/"), vpath), StandardCopyOption.REPLACE_EXISTING);
                 s.setImagePath(vpath);
                 s.setVideoUrl(null);
+            }
+            // 替换封面图
+            Part posterPart = null;
+            try { posterPart = req.getPart("poster"); } catch (Exception e) {}
+            if (posterPart != null && posterPart.getSize() > 0) {
+                if (posterPart.getSize() > 5 * 1024 * 1024) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"封面图不能超过 5MB。\"}"); return;
+                }
+                String pname = getSubmittedFileName(posterPart);
+                String pext = pname.contains(".") ? pname.substring(pname.lastIndexOf(".")).toLowerCase() : ".jpg";
+                // 删除旧封面
+                if (s.getPoster() != null && s.getPoster().startsWith("images/")) {
+                    new java.io.File(req.getServletContext().getRealPath("/"), s.getPoster()).delete();
+                }
+                String ppath = "images/carousel_poster_" + id + pext;
+                Files.copy(posterPart.getInputStream(), Paths.get(req.getServletContext().getRealPath("/"), ppath), StandardCopyOption.REPLACE_EXISTING);
+                s.setPoster(ppath);
+            }
+            String posterUrl = req.getParameter("poster_url");
+            if (posterUrl != null && !posterUrl.trim().isEmpty()) {
+                s.setPoster(posterUrl.trim());
             }
             carouselDAO.update(s);
             resp.getWriter().write("{\"success\":true,\"message\":\"已更新！\"}");
@@ -1052,6 +1148,7 @@ public class BlogServlet extends HttpServlet {
             sb.append(",\"username\":\"").append(escapeJson(targetUser.getUsername())).append("\"");
             sb.append(",\"nickname\":\"").append(escapeJson(targetUser.getNickname())).append("\"");
             sb.append(",\"avatar\":").append(targetUser.getAvatar() != null ? "\"" + escapeJson(targetUser.getAvatar()) + "\"" : "null");
+            sb.append(",\"background\":").append(targetUser.getBackground() != null ? "\"" + escapeJson(targetUser.getBackground()) + "\"" : "null");
             sb.append(",\"role\":\"").append(escapeJson(targetUser.getRole())).append("\"");
             sb.append(",\"createdAt\":\"").append(targetUser.getCreatedAt() != null ? targetUser.getCreatedAt().toString() : "").append("\"");
             sb.append(",\"postCount\":").append(postCount);
@@ -1488,11 +1585,22 @@ public class BlogServlet extends HttpServlet {
         sb.append(",\"title\":").append(s.getTitle() != null ? "\"" + escapeJson(s.getTitle()) + "\"" : "null");
         sb.append(",\"sort_order\":").append(s.getSortOrder());
         sb.append(",\"is_active\":").append(s.getIsActive());
-        if (s.getImagePath() != null) {
+        // poster / 封面 URL
+        String posterUrl = s.getPosterUrl(ctx);
+        if (posterUrl != null) {
+            sb.append(",\"poster\":\"").append(escapeJson(posterUrl)).append("\"");
+        }
+        if (s.getPoster() != null && !s.getPoster().isEmpty()) {
+            sb.append(",\"poster_path\":\"").append(escapeJson(s.getPoster())).append("\"");
+        }
+        if (s.getImagePath() != null && !s.getImagePath().isEmpty()) {
             sb.append(",\"url\":\"").append(escapeJson(ctx + "/" + s.getImagePath() + "?t=" + s.getCreatedAt().getTime())).append("\"");
             if ("video".equals(s.getType())) {
                 sb.append(",\"local_video_url\":\"").append(escapeJson(ctx + "/" + s.getImagePath())).append("\"");
             }
+        }
+        if ("video".equals(s.getType()) && s.getVideoUrl() != null) {
+            sb.append(",\"video_src\":\"").append(escapeJson(s.getVideoUrl())).append("\"");
         }
         String thumb = s.getThumbUrl();
         if (thumb != null) sb.append(",\"thumb\":\"").append(escapeJson(thumb)).append("\"");
@@ -1531,8 +1639,34 @@ public class BlogServlet extends HttpServlet {
         if (user.getAvatar() != null) {
             sb.append(",\"avatar\":\"").append(escapeJson(user.getAvatar())).append("\"");
         }
+        if (user.getBackground() != null) {
+            sb.append(",\"background\":\"").append(escapeJson(user.getBackground())).append("\"");
+        }
         sb.append("}}");
         return sb.toString();
+    }
+
+    /** 保存轮播海报/封面图文件，设置到 CarouselSlide.poster */
+    private void savePosterFile(HttpServletRequest req, CarouselSlide s) {
+        try {
+            Part posterPart = req.getPart("poster");
+            if (posterPart == null || posterPart.getSize() == 0) return;
+            String pname = getSubmittedFileName(posterPart);
+            String pext = pname.contains(".") ? pname.substring(pname.lastIndexOf(".")).toLowerCase() : ".jpg";
+            if (!pext.matches("\\.(jpg|jpeg|png|gif|webp)$")) return;
+            String ppath = "images/carousel_poster_" + s.getId() + "_" + System.currentTimeMillis() + pext;
+            Files.copy(posterPart.getInputStream(), Paths.get(req.getServletContext().getRealPath("/"), ppath), StandardCopyOption.REPLACE_EXISTING);
+            // 删除旧海报文件
+            if (s.getPoster() != null && s.getPoster().startsWith("images/")) {
+                try { new java.io.File(req.getServletContext().getRealPath("/"), s.getPoster()).delete(); } catch (Exception e) {}
+            }
+            s.setPoster(ppath);
+        } catch (Exception e) { /* poster 可选 */ }
+        // 也接受外链 poster URL
+        String posterUrl = req.getParameter("poster_url");
+        if (posterUrl != null && !posterUrl.trim().isEmpty()) {
+            s.setPoster(posterUrl.trim());
+        }
     }
 
     /** 从 multipart Part 中提取文件名 */

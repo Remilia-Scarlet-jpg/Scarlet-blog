@@ -65,31 +65,37 @@
                 <p>欢迎来到幻想乡一隅的红魔馆</p>
             </div>
 
-            <%-- 轮播图（数据库驱动） --%>
+            <%-- 轮播图（数据库驱动，统一海报模式） --%>
             <div class="carousel-container">
                 <div class="carousel-track" id="carouselTrack">
                     <% if (slides != null && !slides.isEmpty()) {
                         for (int si = 0; si < slides.size(); si++) {
                             CarouselSlide s = slides.get(si);
-                            String imgPath = s.getImagePath();
-                            boolean isFirst = (si == 0);
+                            String posterUrl = s.getPosterUrl(ctxPath);
+                            if (posterUrl == null) posterUrl = ctxPath + "/images/slide_1.jpg";
+                            String videoSrc = null;
+                            if ("video".equals(s.getType())) {
+                                if (s.getImagePath() != null && !s.getImagePath().isEmpty())
+                                    videoSrc = ctxPath + "/" + s.getImagePath();
+                                else if (s.getVideoUrl() != null)
+                                    videoSrc = s.getVideoUrl();
+                            }
                     %>
-                    <div class="carousel-slide" data-type="<%= s.getType() %>">
-                        <% if ("video".equals(s.getType())) {
-                            String videoSrc = (imgPath != null && !imgPath.isEmpty())
-                                ? ctxPath + "/" + imgPath
-                                : (s.getVideoUrl() != null ? s.getVideoUrl() : null);
-                            if (videoSrc != null) {
-                        %>
-                            <video src="<%= videoSrc %>" muted loop playsinline preload="metadata"></video>
-                        <%   }
-                           } else if (imgPath != null && !imgPath.isEmpty()) { %>
-                            <img src="<%=ctxPath%>/<%= imgPath %>?t=<%= s.getCreatedAt() != null ? s.getCreatedAt().getTime() : System.currentTimeMillis() %>" alt="<%= HtmlUtil.escape(s.getTitle() != null ? s.getTitle() : "") %>">
+                    <div class="carousel-slide<%= si == 0 ? " active" : "" %>"
+                         data-type="<%= s.getType() %>"
+                         data-poster="<%= posterUrl %>"
+                         <% if (videoSrc != null) { %>data-video-src="<%= videoSrc %>"<% } %>
+                         onclick="openCarouselSlide(this)">
+                        <img src="<%= posterUrl %>" alt="<%= HtmlUtil.escape(s.getTitle() != null ? s.getTitle() : "") %>">
+                        <% if (videoSrc != null) { %>
+                        <div class="carousel-play-overlay">▶</div>
                         <% } %>
                     </div>
                     <%     }
                        } else { %>
-                    <div class="carousel-slide"><img src="<%=ctxPath%>/images/slide_1.jpg" alt="红魔馆"></div>
+                    <div class="carousel-slide active" data-type="image" data-poster="<%=ctxPath%>/images/slide_1.jpg" onclick="openCarouselSlide(this)">
+                        <img src="<%=ctxPath%>/images/slide_1.jpg" alt="红魔馆">
+                    </div>
                     <% } %>
                 </div>
                 <button class="carousel-arrow carousel-prev" onclick="changeSlide(-1)" title="上一张">◀</button>
@@ -100,6 +106,20 @@
                     <span class="carousel-dot<%= si == 0 ? " active" : "" %>" onclick="goToSlide(<%=si%>)"></span>
                     <%     }
                        } %>
+                </div>
+            </div>
+
+            <%-- 图片灯箱 --%>
+            <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+                <span class="lightbox-close" onclick="closeLightbox()">✕</span>
+                <img id="lightboxImg" src="" alt="">
+            </div>
+
+            <%-- 视频弹窗 --%>
+            <div class="video-modal-overlay" id="videoModal" onclick="closeVideoModal(event)">
+                <div class="video-modal-box" onclick="event.stopPropagation()">
+                    <span class="video-modal-close" onclick="closeVideoModal()">✕</span>
+                    <video id="videoModalPlayer" controls autoplay playsinline></video>
                 </div>
             </div>
 
@@ -232,7 +252,7 @@
     <script src="<%=ctxPath%>/js/lightbox.js"></script>
     <script>
         // ============================================
-        // 🎠 红魔馆轮播（数据库驱动，支持视频）
+        // 🎠 红魔馆轮播（统一海报模式：图片+封面 → 点击出灯箱/视频）
         // ============================================
         var currentSlide = 0;
         var totalSlides = document.querySelectorAll('.carousel-slide').length || 1;
@@ -244,25 +264,15 @@
             if (index >= totalSlides) index = 0;
             if (index < 0) index = totalSlides - 1;
 
-            // 暂停当前视频
-            var prevSlide = document.querySelectorAll('.carousel-slide')[currentSlide];
-            if (prevSlide) {
-                var prevVideo = prevSlide.querySelector('video');
-                if (prevVideo) prevVideo.pause();
-            }
+            // 更新 active 状态
+            var slides = document.querySelectorAll('.carousel-slide');
+            slides.forEach(function(s, i) { s.classList.toggle('active', i === index); });
 
             currentSlide = index;
             track.style.transform = 'translateX(-' + (currentSlide * 100) + '%)';
             dots.forEach(function(d, i) {
                 d.classList.toggle('active', i === currentSlide);
             });
-
-            // 播放新视频
-            var newSlide = document.querySelectorAll('.carousel-slide')[currentSlide];
-            if (newSlide) {
-                var newVideo = newSlide.querySelector('video');
-                if (newVideo) newVideo.play().catch(function(){});
-            }
         }
 
         function changeSlide(dir) {
@@ -280,12 +290,51 @@
             slideInterval = setInterval(function() { changeSlide(1); }, 5000);
         }
 
-        // 启动轮播
-        if (totalSlides > 1) {
-            slideInterval = setInterval(function() { changeSlide(1); }, 5000);
+        // 点击幻灯片 → 图片灯箱 || 视频弹窗
+        function openCarouselSlide(el) {
+            clearInterval(slideInterval);  // 暂停自动轮播
+            if (el.dataset.type === 'video' && el.dataset.videoSrc) {
+                openVideoModal(el.dataset.videoSrc);
+            } else {
+                openLightbox(el.dataset.poster);
+            }
         }
 
-        // 触摸滑动支持
+        // === 图片灯箱 ===
+        function openLightbox(src) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('lightbox').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+            document.body.style.overflow = '';
+            resetTimer();
+        }
+
+        // === 视频弹窗 ===
+        function openVideoModal(src) {
+            var player = document.getElementById('videoModalPlayer');
+            player.src = src;
+            document.getElementById('videoModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeVideoModal(e) {
+            if (e && e.target !== document.getElementById('videoModal')) return;
+            var player = document.getElementById('videoModalPlayer');
+            player.pause();
+            player.src = '';
+            document.getElementById('videoModal').classList.remove('active');
+            document.body.style.overflow = '';
+            resetTimer();
+        }
+
+        // 启动
+        if (totalSlides > 1) {
+            resetTimer();
+        }
+
+        // 触摸滑动
         (function() {
             var container = document.querySelector('.carousel-container');
             var startX = 0;
@@ -294,9 +343,7 @@
             });
             container.addEventListener('touchend', function(e) {
                 var diff = startX - e.changedTouches[0].clientX;
-                if (Math.abs(diff) > 50) {
-                    changeSlide(diff > 0 ? 1 : -1);
-                }
+                if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1);
             });
         })();
     </script>
