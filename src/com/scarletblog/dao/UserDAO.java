@@ -85,7 +85,7 @@ public class UserDAO {
      * 按用户名查找用户（不含密码）
      */
     public User findByUsername(String username) throws SQLException {
-        String sql = "SELECT id, username, nickname, avatar, background, role, created_at FROM users WHERE username = ?";
+        String sql = "SELECT id, username, nickname, avatar, background, role, email, email_verified, created_at FROM users WHERE username = ?";
         Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
@@ -101,7 +101,7 @@ public class UserDAO {
      * 按 ID 查找用户（不含密码，用于公开主页）
      */
     public User findById(int userId) throws SQLException {
-        String sql = "SELECT id, username, nickname, avatar, background, role, created_at FROM users WHERE id = ?";
+        String sql = "SELECT id, username, nickname, avatar, background, role, email, email_verified, created_at FROM users WHERE id = ?";
         Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
@@ -225,6 +225,143 @@ public class UserDAO {
         } finally { DBUtil.close(conn, pstmt, rs); }
     }
 
+    /**
+     * 解绑邮箱
+     */
+    public boolean unbindEmail(int userId) throws SQLException {
+        String sql = "UPDATE users SET email = NULL, email_verified = FALSE, verify_token = NULL, token_expires = NULL WHERE id = ?";
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, null); }
+    }
+
+    /**
+     * 绑定邮箱
+     */
+    public boolean bindEmail(int userId, String email) throws SQLException {
+        String sql = "UPDATE users SET email = ?, email_verified = FALSE, " +
+            "verify_token = ?, token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?";
+        String token = java.util.UUID.randomUUID().toString();
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, email);
+            pstmt.setString(2, token);
+            pstmt.setInt(3, userId);
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, null); }
+    }
+
+    /**
+     * 通过 token 验证邮箱
+     */
+    public boolean verifyEmail(String token) throws SQLException {
+        String sql = "UPDATE users SET email_verified = TRUE, verify_token = NULL, token_expires = NULL " +
+            "WHERE verify_token = ? AND token_expires > NOW()";
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, token);
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, null); }
+    }
+
+    /**
+     * 检查邮箱是否已被绑定
+     */
+    public boolean emailExists(String email) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM users WHERE email = ?";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, email);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt(1) > 0;
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return false;
+    }
+
+    /**
+     * 按邮箱查找用户
+     */
+    public User findByEmail(String email) throws SQLException {
+        String sql = "SELECT id, username, nickname, avatar, background, role, email, email_verified, created_at FROM users WHERE email = ?";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, email);
+            rs = pstmt.executeQuery();
+            if (rs.next()) return mapUser(rs);
+        } finally { DBUtil.close(conn, pstmt, rs); }
+        return null;
+    }
+
+    /**
+     * 生成密码重置 token（忘记密码-邮箱方式步骤1）
+     */
+    public String generateResetToken(String email) throws SQLException {
+        String token = java.util.UUID.randomUUID().toString();
+        String sql = "UPDATE users SET verify_token = ?, token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE email = ?";
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, token);
+            pstmt.setString(2, email);
+            if (pstmt.executeUpdate() > 0) return token;
+        } finally { DBUtil.close(conn, pstmt, null); }
+        return null;
+    }
+
+    /**
+     * 通过重置 token 重置密码（忘记密码-邮箱方式步骤2）
+     */
+    public boolean resetPasswordByToken(String token, String newPassword) throws SQLException {
+        String sql = "UPDATE users SET password = ?, verify_token = NULL, token_expires = NULL " +
+            "WHERE verify_token = ? AND token_expires > NOW()";
+        Connection conn = null; PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, SecurityUtil.hashPassword(newPassword));
+            pstmt.setString(2, token);
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, null); }
+    }
+
+    /**
+     * 重置密码（忘记密码流程）
+     * 验证用户名+昵称后，更新为新密码哈希
+     */
+    public boolean resetPassword(String username, String nickname, String newPassword) throws SQLException {
+        // 先确认用户名+昵称匹配
+        String checkSql = "SELECT COUNT(*) FROM users WHERE username = ? AND nickname = ?";
+        Connection conn = null; PreparedStatement pstmt = null; ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(checkSql);
+            pstmt.setString(1, username);
+            pstmt.setString(2, nickname);
+            rs = pstmt.executeQuery();
+            if (!rs.next() || rs.getInt(1) == 0) return false;
+            pstmt.close();
+
+            // 更新密码
+            pstmt = conn.prepareStatement("UPDATE users SET password = ? WHERE username = ?");
+            pstmt.setString(1, SecurityUtil.hashPassword(newPassword));
+            pstmt.setString(2, username);
+            return pstmt.executeUpdate() > 0;
+        } finally { DBUtil.close(conn, pstmt, rs); }
+    }
+
     private User mapUser(ResultSet rs) throws SQLException {
         User u = new User();
         u.setId(rs.getInt("id"));
@@ -234,6 +371,8 @@ public class UserDAO {
         try { u.setAvatar(rs.getString("avatar")); } catch (SQLException e) {}
         try { u.setBackground(rs.getString("background")); } catch (SQLException e) {}
         u.setRole(rs.getString("role"));
+        try { u.setEmail(rs.getString("email")); } catch (SQLException e) {}
+        try { u.setEmailVerified(rs.getBoolean("email_verified")); } catch (SQLException e) {}
         u.setCreatedAt(rs.getTimestamp("created_at"));
         return u;
     }

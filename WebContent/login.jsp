@@ -171,6 +171,7 @@
 
             <div class="auth-footer">
                 <p>尚未登记？ <a href="<%=ctxPath%>/blog/register">📝 来馆登记 →</a></p>
+                <p><a href="<%=ctxPath%>/blog/forgot-password">🔑 忘记密码？</a></p>
             </div>
         </div>
     </div>

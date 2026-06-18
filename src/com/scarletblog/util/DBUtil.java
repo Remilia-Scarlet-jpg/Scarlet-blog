@@ -377,6 +377,24 @@ public class DBUtil {
                     System.out.println("[DB] Added users.background column");
                 } catch (SQLException e) { /* 已存在 */ }
 
+                // 增量迁移：添加邮箱验证相关列
+                try {
+                    stmt.execute("ALTER TABLE users ADD COLUMN email VARCHAR(100) DEFAULT NULL");
+                    System.out.println("[DB] Added users.email column");
+                } catch (SQLException e) { /* 已存在 */ }
+                try {
+                    stmt.execute("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE");
+                    System.out.println("[DB] Added users.email_verified column");
+                } catch (SQLException e) { /* 已存在 */ }
+                try {
+                    stmt.execute("ALTER TABLE users ADD COLUMN verify_token VARCHAR(64) DEFAULT NULL");
+                    System.out.println("[DB] Added users.verify_token column");
+                } catch (SQLException e) { /* 已存在 */ }
+                try {
+                    stmt.execute("ALTER TABLE users ADD COLUMN token_expires TIMESTAMP NULL DEFAULT NULL");
+                    System.out.println("[DB] Added users.token_expires column");
+                } catch (SQLException e) { /* 已存在 */ }
+
                 // 检查是否需要种子公共茶室
                 rs = stmt.executeQuery("SELECT COUNT(*) FROM chat_rooms WHERE type = 'public'");
                 rs.next();

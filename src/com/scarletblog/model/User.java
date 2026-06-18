@@ -13,6 +13,8 @@ public class User {
     private String avatar;     // 头像图片路径
     private String background; // 个人主页背景图 (base64)
     private String role;       // 身份: 馆主/女仆长/住人
+    private String email;      // QQ邮箱
+    private boolean emailVerified; // 邮箱是否已验证
     private Timestamp createdAt;
 
     public User() {}
@@ -38,6 +40,12 @@ public class User {
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }

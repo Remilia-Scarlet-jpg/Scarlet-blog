@@ -399,6 +399,9 @@
                             <div class="sidebar-row"><span class="sidebar-row-label">🎭 称呼</span><span><%= HtmlUtil.escape(profileUser.getNickname()) %></span></div>
                             <div class="sidebar-row"><span class="sidebar-row-label">⚜️ 身份</span><span><%= HtmlUtil.escape(profileUser.getRole()) %></span></div>
                             <div class="sidebar-row"><span class="sidebar-row-label">📅 入馆</span><span><%= profileUser.getCreatedAt() != null ? new SimpleDateFormat("yyyy年MM月dd日").format(profileUser.getCreatedAt()) : "未知" %></span></div>
+                            <% if (profileUser.getEmail() != null) { %>
+                            <div class="sidebar-row"><span class="sidebar-row-label">📧 邮箱</span><span><%= HtmlUtil.escape(profileUser.getEmail()) %> <%= profileUser.isEmailVerified() ? "✅" : "⚠ 未验证" %></span></div>
+                            <% } %>
                         </div>
                     </div>
                 </div>
@@ -451,6 +454,36 @@
                             <button class="sidebar-action-btn" style="flex:1;background:transparent;border:1px solid var(--border-dark);color:var(--text-muted);" onclick="switchEditTab('edit')">✏️ 称呼</button>
                             <button class="sidebar-action-btn" style="flex:1;background:transparent;border:1px solid var(--border-dark);color:var(--text-muted);" onclick="switchEditTab('password')">🔐 密语</button>
                         </div>
+                    </div>
+                    <% } %>
+
+                    <%-- 自己可见：邮箱绑定 --%>
+                    <% if (isOwnProfile) { %>
+                    <div class="sidebar-card" style="margin-top:12px;">
+                        <div class="sidebar-card-title">📧 邮箱绑定</div>
+                        <% if (profileUser.getEmail() == null) { %>
+                            <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:10px;">绑定QQ邮箱后可通过邮箱找回密码。</p>
+                            <input type="email" id="bindEmailInput" placeholder="your-email@qq.com" style="width:100%;background:var(--bg-dark);border:1px solid var(--border-dark);color:var(--text-light);padding:8px 10px;font-size:0.85rem;border-radius:4px;margin-bottom:8px;">
+                            <button class="sidebar-action-btn" onclick="bindEmail()" style="width:100%;background:rgba(139,0,0,0.4);border:1px solid var(--scarlet);color:var(--scarlet-light);">📧 发送验证邮件</button>
+                        <% } else if (!profileUser.isEmailVerified()) { %>
+                            <p style="color:var(--gold);font-size:0.8rem;margin-bottom:6px;">📧 <%= profileUser.getEmail() %></p>
+                            <p style="color:var(--scarlet-light);font-size:0.75rem;margin-bottom:10px;">⚠ 尚未验证，请检查邮箱中的验证链接。</p>
+                            <div style="display:flex;gap:6px;">
+                                <button class="sidebar-action-btn" onclick="bindEmail()" style="flex:1;background:rgba(139,0,0,0.4);border:1px solid var(--scarlet);color:var(--scarlet-light);">🔄 重发验证</button>
+                                <button class="sidebar-action-btn" onclick="unbindEmail()" style="flex:1;background:transparent;border:1px solid var(--scarlet-darkest);color:var(--scarlet-light);">❌ 解绑</button>
+                            </div>
+                        <% } else { %>
+                            <p style="color:var(--gold);font-size:0.85rem;margin-bottom:4px;">📧 <%= profileUser.getEmail() %></p>
+                            <p style="color:#2ecc71;font-size:0.75rem;margin-bottom:10px;">✅ 已验证 · 可通过邮箱找回密码</p>
+                            <div style="display:flex;gap:6px;">
+                                <button class="sidebar-action-btn" onclick="changeEmail()" style="flex:1;background:transparent;border:1px solid var(--border-dark);color:var(--text-muted);">🔄 更换</button>
+                                <button class="sidebar-action-btn" onclick="unbindEmail()" style="flex:1;background:transparent;border:1px solid var(--scarlet-darkest);color:var(--scarlet-light);">❌ 解绑</button>
+                            </div>
+                            <div id="changeEmailBox" style="display:none;margin-top:8px;">
+                                <input type="email" id="bindEmailInput2" placeholder="输入新邮箱" style="width:100%;background:var(--bg-dark);border:1px solid var(--border-dark);color:var(--text-light);padding:8px 10px;font-size:0.85rem;border-radius:4px;margin-bottom:8px;">
+                                <button class="sidebar-action-btn" onclick="bindEmail()" style="width:100%;background:rgba(139,0,0,0.4);border:1px solid var(--scarlet);color:var(--scarlet-light);">📧 发送新验证邮件</button>
+                            </div>
+                        <% } %>
                     </div>
                     <% } %>
 
@@ -549,15 +582,11 @@
         var CTX_PATH = '<%=ctxPath%>';
     </script>
 
-    <%-- 自己的编辑 JS --%>
-    <% if (isOwnProfile) { %>
-    <script src="<%=ctxPath%>/js/api.js?v=20260616"></script>
+    <%-- 公共 JS：tab 切换（自己和别人页面都需要） --%>
     <script>
         function switchContentTab(tab) {
-            // 内容区 tab
             document.querySelectorAll('.user-content-tab').forEach(function(t) { t.classList.remove('active'); });
             document.querySelectorAll('.user-content-panel').forEach(function(p) { p.classList.remove('active'); });
-            // 头部标签栏
             document.querySelectorAll('.user-tab').forEach(function(t) { t.classList.remove('active'); });
             if (tab === 'posts') {
                 document.querySelectorAll('.user-content-tab')[0].classList.add('active');
@@ -569,6 +598,10 @@
                 document.querySelectorAll('.user-tab')[1].classList.add('active');
             }
         }
+    </script>
+    <% if (isOwnProfile) { %>
+    <script src="<%=ctxPath%>/js/api.js?v=20260616"></script>
+    <script>
         function switchEditTab(tab) {
             document.querySelectorAll('.profile-panel').forEach(function(p) { p.classList.remove('active'); });
             document.getElementById('panel-' + tab).classList.add('active');
@@ -886,6 +919,42 @@
             var t=document.createElement('div');t.className='toast '+(type||'success');t.textContent=msg;c.appendChild(t);
             setTimeout(function(){t.style.opacity='0';t.style.transition='all 0.4s';setTimeout(function(){t.remove();},400);},3500);
         }
+    </script>
+
+    <%-- 邮箱绑定 --%>
+    <script>
+    function bindEmail() {
+        var email = '';
+        var el1 = document.getElementById('bindEmailInput');
+        var el2 = document.getElementById('bindEmailInput2');
+        if (el2 && el2.value.trim()) {
+            email = el2.value.trim();
+        } else if (el1 && el1.value.trim()) {
+            email = el1.value.trim();
+        } else {
+            // 已绑定未验证状态：没有输入框，直接用已绑定的邮箱重新发送
+            email = '<%= profileUser.getEmail() != null ? profileUser.getEmail() : "" %>';
+        }
+        if (!email) { alert('请输入邮箱地址。'); return; }
+        fetch('<%=ctxPath%>/api/auth/bind-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'email=' + encodeURIComponent(email)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.success) { alert(d.message); location.reload(); }
+            else { alert(d.error); }
+        });
+    }
+    function unbindEmail() {
+        if (!confirm('确定要解绑邮箱吗？解绑后将无法通过邮箱找回密码。')) return;
+        fetch('<%=ctxPath%>/api/auth/unbind-email', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'} })
+            .then(function(r){return r.json()})
+            .then(function(d){ if(d.success) location.reload(); else alert(d.error); });
+    }
+    function changeEmail() {
+        var box = document.getElementById('changeEmailBox');
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
     </script>
 
     <%-- 全局茶话会通知轮询 --%>

@@ -175,6 +175,11 @@
                     <input type="password" name="password" id="password" placeholder="设置你的封印密语，至少4个字符" maxlength="100" required>
                 </div>
                 <div class="form-group">
+                    <label>📧 QQ邮箱（选填，用于找回密码）</label>
+                    <input type="email" name="email" id="email" placeholder="your-email@qq.com" maxlength="100">
+                    <p class="hint-text" style="color:var(--text-muted);font-size:0.75rem;margin-top:4px;font-style:italic;">绑定QQ邮箱后可通过邮箱找回密码。注册后可随时在个人主页绑定。</p>
+                </div>
+                <div class="form-group">
                     <label>🧩 验证码</label>
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span id="captchaQuestion" style="background:var(--bg-dark);padding:12px 18px;border:1px solid var(--border-dark);border-radius:4px;color:var(--gold);font-family:var(--font-title);font-size:1.1rem;letter-spacing:1px;min-width:120px;text-align:center;">加载中...</span>
@@ -237,10 +242,14 @@
             btn.textContent = '⏳ 登记中...';
 
             try {
+                var emailVal = document.getElementById('email').value.trim();
                 var formData = 'username=' + encodeURIComponent(username)
                     + '&password=' + encodeURIComponent(password)
                     + '&nickname=' + encodeURIComponent(nickname || username)
                     + '&captcha=' + encodeURIComponent(captcha);
+                if (emailVal) {
+                    formData += '&email=' + encodeURIComponent(emailVal);
+                }
                 var resp = await fetch('<%=ctxPath%>/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

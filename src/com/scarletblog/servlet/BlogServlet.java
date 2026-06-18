@@ -100,6 +100,10 @@ public class BlogServlet extends HttpServlet {
                 handleFriendsAPI(req, resp);
             } else if (path.startsWith("/api/chat")) {
                 handleChatAPI(req, resp);
+            } else if (path.equals("/blog/forgot-password")) {
+                handleForgotPasswordPage(req, resp);
+            } else if (path.equals("/blog/verify-email")) {
+                handleVerifyEmailPage(req, resp);
             } else if (path.startsWith("/blog/chat")) {
                 handleChatPage(req, resp);
             } else {
@@ -146,6 +150,40 @@ public class BlogServlet extends HttpServlet {
             return;
         }
         req.getRequestDispatcher("/login.jsp").forward(req, resp);
+    }
+
+    // ============================================
+    // 找回封印密语 (忘记密码页面)
+    // ============================================
+    private void handleForgotPasswordPage(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        User user = getCurrentUser(req);
+        if (user != null) {
+            resp.sendRedirect(req.getContextPath() + "/blog");
+            return;
+        }
+        // 如果有 token 参数，说明是邮箱重置链接 → 传给页面处理
+        String token = req.getParameter("token");
+        if (token != null && !token.trim().isEmpty()) {
+            req.setAttribute("resetToken", token.trim());
+        }
+        req.getRequestDispatcher("/forgot-password.jsp").forward(req, resp);
+    }
+
+    // ============================================
+    // 邮箱验证落地页
+    // ============================================
+    private void handleVerifyEmailPage(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        String token = req.getParameter("token");
+        // 即使未登录也可能访问（点击邮件中的链接）
+        if (token != null && !token.trim().isEmpty()) {
+            boolean ok = userDAO.verifyEmail(token.trim());
+            req.setAttribute("verifyResult", ok ? "success" : "fail");
+        } else {
+            req.setAttribute("verifyResult", "missing");
+        }
+        req.getRequestDispatcher("/verify-email.jsp").forward(req, resp);
     }
 
     // ============================================
@@ -342,6 +380,28 @@ public class BlogServlet extends HttpServlet {
             if (id > 0) {
                 newUser.setId(id);
                 newUser.setRole("住人");  // 新登记默认身份
+                // 如果注册时提供了邮箱 → 自动绑定并发送验证邮件
+                String regEmail = req.getParameter("email");
+                if (regEmail != null && !regEmail.trim().isEmpty() && regEmail.matches("^[\\w\\-\\.]+@[\\w\\-\\.]+\\.\\w+$")) {
+                    try {
+                        if (!userDAO.emailExists(regEmail.trim()) && com.scarletblog.util.EmailUtil.isConfigured()) {
+                            userDAO.bindEmail(id, regEmail.trim());
+                            String ctxPath = req.getScheme() + "://" + req.getServerName() +
+                                (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "") +
+                                req.getContextPath();
+                            // regenerate token for email
+                            String token = java.util.UUID.randomUUID().toString();
+                            java.sql.Connection c = com.scarletblog.util.DBUtil.getConnection();
+                            java.sql.PreparedStatement ps = c.prepareStatement(
+                                "UPDATE users SET verify_token = ?, token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?");
+                            ps.setString(1, token);
+                            ps.setInt(2, id);
+                            ps.executeUpdate();
+                            ps.close(); c.close();
+                            com.scarletblog.util.EmailUtil.sendVerifyEmail(regEmail.trim(), token);
+                        }
+                    } catch (Exception e) { /* 邮件发送失败不影响注册 */ }
+                }
                 // 自动加入所有公共茶室
                 try { chatDAO.addUserToPublicRooms(id); } catch (Exception e) {}
                 // 登记成功，自动入馆 —— Session 加固
@@ -457,6 +517,239 @@ public class BlogServlet extends HttpServlet {
                 resp.getWriter().write("{\"success\":true,\"message\":\"封印密语已更新！\"}");
             } else {
                 resp.getWriter().write("{\"success\":false,\"error\":\"旧封印密语不正确。\"}");
+            }
+        }
+        // POST /api/auth/forgot-password — 忘记密码步骤1：验证用户名或发送重置邮件
+        else if (path.equals("/api/auth/forgot-password") && method.equals("POST")) {
+            String username = req.getParameter("username");
+            String email = req.getParameter("email");
+            String captcha = req.getParameter("captcha");
+
+            // 限流检查
+            String ip = getClientIP(req);
+            if (SecurityUtil.isBlocked(ip)) {
+                long sec = SecurityUtil.getBlockSeconds(ip);
+                resp.getWriter().write("{\"success\":false,\"error\":\"尝试次数过多，请 " + (sec / 60 + 1) + " 分钟后再试。\"}");
+                return;
+            }
+
+            // 验证码检查
+            HttpSession session = req.getSession(false);
+            if (session == null || session.getAttribute("captchaAnswer") == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码已过期，请刷新。\"}");
+                return;
+            }
+            String expectedCaptcha = (String) session.getAttribute("captchaAnswer");
+            if (captcha == null || !captcha.trim().equalsIgnoreCase(expectedCaptcha)) {
+                session.removeAttribute("captchaAnswer");
+                SecurityUtil.recordFailure(ip);
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码错误，请重新输入。\"}");
+                return;
+            }
+            session.removeAttribute("captchaAnswer");
+
+            // ===== 邮箱方式：发送重置邮件 =====
+            if (email != null && !email.trim().isEmpty()) {
+                User foundUser = userDAO.findByEmail(email.trim());
+                if (foundUser == null) {
+                    SecurityUtil.recordFailure(ip);
+                    resp.getWriter().write("{\"success\":false,\"error\":\"该邮箱未绑定任何账号。\"}");
+                    return;
+                }
+                if (!com.scarletblog.util.EmailUtil.isConfigured()) {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"邮件服务尚未配置，请使用昵称验证方式。\"}");
+                    return;
+                }
+                String token = userDAO.generateResetToken(email.trim());
+                if (token != null) {
+                    String ctxPath = req.getScheme() + "://" + req.getServerName() +
+                        (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "") +
+                        req.getContextPath();
+                    com.scarletblog.util.EmailUtil.sendResetEmail(email.trim(), token);
+                    SecurityUtil.clearAttempts(ip);
+                    resp.getWriter().write("{\"success\":true,\"message\":\"重置邮件已发送！请检查你的QQ邮箱（30分钟内有效）。\"}");
+                } else {
+                    resp.getWriter().write("{\"success\":false,\"error\":\"发送失败，请稍后再试。\"}");
+                }
+                return;
+            }
+
+            // ===== 昵称方式：验证用户名 =====
+            if (username == null || username.trim().isEmpty()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请输入你的名札。\"}");
+                return;
+            }
+
+            User foundUser = userDAO.findByUsername(username.trim());
+            if (foundUser == null) {
+                SecurityUtil.recordFailure(ip);
+                resp.getWriter().write("{\"success\":false,\"error\":\"此名札未登记，请确认后重试。\"}");
+                return;
+            }
+
+            // 验证成功，清除失败记录
+            SecurityUtil.clearAttempts(ip);
+            resp.getWriter().write("{\"success\":true,\"message\":\"身份确认，请继续验证。\"}");
+        }
+        // POST /api/auth/reset-password — 忘记密码步骤2：验证昵称 + 重置密码
+        else if (path.equals("/api/auth/reset-password") && method.equals("POST")) {
+            String username = req.getParameter("username");
+            String nickname = req.getParameter("nickname");
+            String newPassword = req.getParameter("new_password");
+            String captcha = req.getParameter("captcha");
+
+            // 限流检查
+            String ip = getClientIP(req);
+            if (SecurityUtil.isBlocked(ip)) {
+                long sec = SecurityUtil.getBlockSeconds(ip);
+                resp.getWriter().write("{\"success\":false,\"error\":\"尝试次数过多，请 " + (sec / 60 + 1) + " 分钟后再试。\"}");
+                return;
+            }
+
+            // 验证码检查
+            HttpSession session = req.getSession(false);
+            if (session == null || session.getAttribute("captchaAnswer") == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码已过期，请刷新。\"}");
+                return;
+            }
+            String expectedCaptcha = (String) session.getAttribute("captchaAnswer");
+            if (captcha == null || !captcha.trim().equalsIgnoreCase(expectedCaptcha)) {
+                session.removeAttribute("captchaAnswer");
+                SecurityUtil.recordFailure(ip);
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码错误，请重新输入。\"}");
+                return;
+            }
+            session.removeAttribute("captchaAnswer");
+
+            if (username == null || username.trim().isEmpty()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"缺少用户名。\"}");
+                return;
+            }
+            if (nickname == null || nickname.trim().isEmpty()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请输入你的称呼。\"}");
+                return;
+            }
+            if (newPassword == null || newPassword.length() < 4) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"新密码至少需要4个字符。\"}");
+                return;
+            }
+
+            boolean ok = userDAO.resetPassword(username.trim(), nickname.trim(), newPassword);
+            if (ok) {
+                SecurityUtil.clearAttempts(ip);
+                // 销毁旧 session（如果有），防止会话固定
+                HttpSession oldSession = req.getSession(false);
+                if (oldSession != null) oldSession.invalidate();
+                resp.getWriter().write("{\"success\":true,\"message\":\"封印密语已重置！3秒后将跳转到登录页…\"}");
+            } else {
+                SecurityUtil.recordFailure(ip);
+                resp.getWriter().write("{\"success\":false,\"error\":\"称呼不匹配，请确认后重试。\"}");
+            }
+        }
+        // POST /api/auth/bind-email — 绑定/更换邮箱
+        else if (path.equals("/api/auth/bind-email") && method.equals("POST")) {
+            User user = getCurrentUser(req);
+            if (user == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+                return;
+            }
+            String email = req.getParameter("email");
+            if (email == null || !email.matches("^[\\w\\-\\.]+@[\\w\\-\\.]+\\.\\w+$")) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请输入有效的邮箱地址。\"}");
+                return;
+            }
+            // 检查邮箱是否已被其他人绑定
+            if (userDAO.emailExists(email.trim())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"此邮箱已被其他账号绑定。\"}");
+                return;
+            }
+            // 检查邮件服务是否配置
+            if (!com.scarletblog.util.EmailUtil.isConfigured()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"邮件服务尚未配置。请联系馆主。\"}");
+                return;
+            }
+            boolean ok = userDAO.bindEmail(user.getId(), email.trim());
+            if (ok) {
+                // 异步发送验证邮件
+                String ctxPath = req.getScheme() + "://" + req.getServerName() +
+                    (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "") +
+                    req.getContextPath();
+                // token already stored in DB by bindEmail, need to retrieve it
+                // Re-generate and send
+                String token = java.util.UUID.randomUUID().toString();
+                // Update token again (bindEmail already set one, let's update with this new one)
+                java.sql.Connection c = com.scarletblog.util.DBUtil.getConnection();
+                java.sql.PreparedStatement ps = c.prepareStatement(
+                    "UPDATE users SET verify_token = ?, token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?");
+                ps.setString(1, token);
+                ps.setInt(2, user.getId());
+                ps.executeUpdate();
+                ps.close(); c.close();
+                com.scarletblog.util.EmailUtil.sendVerifyEmail(email.trim(), token);
+                // 刷新 session 中的用户信息
+                user.setEmail(email.trim());
+                user.setEmailVerified(false);
+                req.getSession().setAttribute("user", user);
+                resp.getWriter().write("{\"success\":true,\"message\":\"验证邮件已发送！请检查你的QQ邮箱（30分钟内有效）。\"}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"绑定失败，请稍后再试。\"}");
+            }
+        }
+        // POST /api/auth/unbind-email — 解绑邮箱
+        else if (path.equals("/api/auth/unbind-email") && method.equals("POST")) {
+            User user = getCurrentUser(req);
+            if (user == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"请先入馆。\"}");
+                return;
+            }
+            boolean ok = userDAO.unbindEmail(user.getId());
+            if (ok) {
+                // 刷新 session
+                user.setEmail(null);
+                user.setEmailVerified(false);
+                req.getSession().setAttribute("user", user);
+                resp.getWriter().write("{\"success\":true,\"message\":\"邮箱已解绑。\"}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"解绑失败，请稍后再试。\"}");
+            }
+        }
+        // POST /api/auth/reset-by-token — 通过邮件 token 重置密码
+        else if (path.equals("/api/auth/reset-by-token") && method.equals("POST")) {
+            String token = req.getParameter("token");
+            String newPassword = req.getParameter("new_password");
+            String captcha = req.getParameter("captcha");
+
+            // 验证码
+            HttpSession session = req.getSession(false);
+            if (session == null || session.getAttribute("captchaAnswer") == null) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码已过期，请刷新。\"}");
+                return;
+            }
+            String expectedCaptcha = (String) session.getAttribute("captchaAnswer");
+            if (captcha == null || !captcha.trim().equalsIgnoreCase(expectedCaptcha)) {
+                session.removeAttribute("captchaAnswer");
+                resp.getWriter().write("{\"success\":false,\"error\":\"验证码错误，请重新输入。\"}");
+                return;
+            }
+            session.removeAttribute("captchaAnswer");
+
+            if (token == null || token.trim().isEmpty()) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"缺少重置 token。\"}");
+                return;
+            }
+            if (newPassword == null || newPassword.length() < 4) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"新密码至少需要4个字符。\"}");
+                return;
+            }
+
+            boolean ok = userDAO.resetPasswordByToken(token.trim(), newPassword);
+            if (ok) {
+                // 销毁旧 session
+                HttpSession oldSession = req.getSession(false);
+                if (oldSession != null) oldSession.invalidate();
+                resp.getWriter().write("{\"success\":true,\"message\":\"封印密语已重置！请用新密码登录。\"}");
+            } else {
+                resp.getWriter().write("{\"success\":false,\"error\":\"链接已过期或无效，请重新申请重置。\"}");
             }
         }
         // GET /api/auth/logout — 离馆（销毁 session 后回大厅）
@@ -1641,6 +1934,10 @@ public class BlogServlet extends HttpServlet {
         }
         if (user.getBackground() != null) {
             sb.append(",\"background\":\"").append(escapeJson(user.getBackground())).append("\"");
+        }
+        if (user.getEmail() != null) {
+            sb.append(",\"email\":\"").append(escapeJson(user.getEmail())).append("\"");
+            sb.append(",\"email_verified\":").append(user.isEmailVerified());
         }
         sb.append("}}");
         return sb.toString();
