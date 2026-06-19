@@ -605,10 +605,17 @@
             var type = document.getElementById('editSlideType').value;
             document.getElementById('slideImageGroup').style.display = type === 'image' ? '' : 'none';
             document.getElementById('slideVideoGroup').style.display = type === 'video' ? '' : 'none';
+            // 视频模式下解除图片 required，防止浏览器拦截
+            if (type === 'video') {
+                document.getElementById('editSlideImage').required = false;
+            } else {
+                document.getElementById('editSlideImage').required = !document.getElementById('editSlideId').value;
+            }
         }
 
         function saveCarouselSlide(e) {
             e.preventDefault();
+            try {
             var id = document.getElementById('editSlideId').value;
             var type = document.getElementById('editSlideType').value;
             var title = document.getElementById('editSlideTitle').value.trim();
@@ -654,7 +661,11 @@
                     }
                 } catch(ex) { showToast('操作失败', 'error'); }
             };
+            xhr.onerror = function() {
+                showToast('网络错误，请检查连接或文件是否过大', 'error');
+            };
             xhr.send(fd);
+            } catch(ex) { showToast('JS错误: ' + ex.message, 'error'); console.error(ex); }
         }
 
         function deleteCarouselSlide(id) {
@@ -792,7 +803,7 @@
                 <button class="modal-close" onclick="closeCarouselModal()">✕</button>
             </div>
             <div class="modal-body">
-                <form onsubmit="saveCarouselSlide(event)">
+                <form onsubmit="saveCarouselSlide(event)" novalidate>
                     <input type="hidden" id="editSlideId">
                     <div class="form-group">
                         <label>📌 类型</label>

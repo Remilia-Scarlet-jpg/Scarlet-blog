@@ -36,8 +36,8 @@ import java.util.regex.Pattern;
  * 处理所有 /blog/* 和 /api/* 请求
  */
 @MultipartConfig(
-    maxFileSize = 5 * 1024 * 1024,      // 5MB
-    maxRequestSize = 10 * 1024 * 1024,  // 10MB
+    maxFileSize = 52 * 1024 * 1024,      // 52MB（预留视频上传空间）
+    maxRequestSize = 60 * 1024 * 1024,   // 60MB
     fileSizeThreshold = 1024 * 1024      // 1MB buffer
 )
 public class BlogServlet extends HttpServlet {
