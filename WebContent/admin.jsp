@@ -189,7 +189,7 @@
                     <h2>👥 住人名单</h2>
                 </div>
                 <p style="color:var(--text-muted);margin-bottom:16px;">
-                    仅馆主大人可以任命或解除女仆长。身份为 <strong style="color:var(--gold);">住人</strong> 可升为女仆长，<strong style="color:var(--gold);">女仆长</strong> 可降为住人。
+                    仅馆主大人可以任命或解除管家。身份为 <strong style="color:var(--gold);">住人</strong> 可升为管家，<strong style="color:var(--gold);">管家</strong> 可降为住人。<strong style="color:var(--scarlet-light);">女仆长</strong> 为永久身份，不可升降。
                 </p>
                 <div style="overflow-x:auto;">
                     <table class="admin-table">
@@ -527,7 +527,7 @@
                             avatarHtml = '<div style="width:36px;height:36px;border-radius:50%;background:var(--scarlet-deep);' +
                                 'display:flex;align-items:center;justify-content:center;font-size:0.8rem;">👤</div>';
                         }
-                        var roleColor = u.role === '馆主' ? 'var(--gold)' : u.role === '女仆长' ? 'var(--scarlet-light)' : 'var(--text-muted)';
+                        var roleColor = u.role === '馆主' ? 'var(--gold)' : u.role === '女仆长' ? 'var(--scarlet-light)' : u.role === '管家' ? '#5af' : 'var(--text-muted)';
                         html += '<tr>' +
                             '<td>' + u.id + '</td>' +
                             '<td>' + avatarHtml + '</td>' +
@@ -546,16 +546,19 @@
             if (_currentUserRole !== '馆主') return '';
             if (u.role === '馆主') return '<span style="color:var(--text-muted);font-size:0.8rem;">馆主大人</span>';
             if (u.role === '女仆长') {
-                return '<button class="btn-scarlet-outline btn-danger" onclick="changeRole(' + u.id + ',\'住人\',\'' + escHtml(u.nickname) + '\')" style="padding:4px 12px;font-size:0.75rem;">⬇️ 解除女仆长</button>';
+                return '<span style="color:var(--scarlet-light);font-size:0.8rem;">🔒 永久女仆长</span>';
+            }
+            if (u.role === '管家') {
+                return '<button class="btn-scarlet-outline btn-danger" onclick="changeRole(' + u.id + ',\'住人\',\'' + escHtml(u.nickname) + '\')" style="padding:4px 12px;font-size:0.75rem;">⬇️ 解除管家</button>';
             }
             if (u.role === '住人') {
-                return '<button class="btn-scarlet-outline" onclick="changeRole(' + u.id + ',\'女仆长\',\'' + escHtml(u.nickname) + '\')" style="padding:4px 12px;font-size:0.75rem;border-color:var(--scarlet-light);color:var(--scarlet-light);">⬆️ 任命女仆长</button>';
+                return '<button class="btn-scarlet-outline" onclick="changeRole(' + u.id + ',\'管家\',\'' + escHtml(u.nickname) + '\')" style="padding:4px 12px;font-size:0.75rem;border-color:#5af;color:#5af;">⬆️ 任命管家</button>';
             }
             return '';
         }
 
         function changeRole(userId, newRole, nickname) {
-            var actionText = newRole === '女仆长' ? '任命为女仆长' : '解除女仆长职务';
+            var actionText = newRole === '管家' ? '任命为管家' : '解除管家职务';
             if (!confirm('确定要将 ' + nickname + ' ' + actionText + ' 吗？')) return;
             var xhr = new XMLHttpRequest();
             xhr.open('PUT', API_BASE + '/admin/users/' + userId + '/role', true);

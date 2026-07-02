@@ -165,14 +165,25 @@ myblog-src/
 - 双模式发邮件：本地 QQ SMTP / 云端 Resend HTTP API
 - 依赖：javax.mail-1.6.2.jar + jakarta.activation-1.2.2.jar
 
+### v5 — 轮播图视频上传修复 (6/19)
+- 修复：上传视频点保存无响应
+  - 根因：浏览器原生表单验证拦截 `required` 字段（图片 input 在视频模式下被隐藏但 required=true）
+  - 修复：表单加 `novalidate` + 视频模式下动态解除 image required
+  - 顺修：`@MultipartConfig` 5MB→52MB，Tomcat Connector 加 `maxPostSize="-1"`（默认 2MB 拒绝视频）
+  - 顺修：`xhr.onerror` 错误提示 + JS try-catch 兜底
+
 ## 8. 本地编译部署（不用 IDE）
 
 ```bash
 # === 1. 编译 Java ===
 cd "C:\Users\dxy28\Desktop\Desktop\myblog-src"
-javac -cp "C:\Users\dxy28\tools\tomcat9\lib\servlet-api.jar;\
+javac -encoding UTF-8 -cp "\
+C:\Users\dxy28\tools\tomcat9\lib\servlet-api.jar;\
 C:\Users\dxy28\tools\tomcat9\lib\tomcat-jdbc.jar;\
-WebContent\WEB-INF\lib\mysql-connector-j-9.3.0.jar;bin" \
+C:\Users\dxy28\tools\tomcat9\lib\mysql-connector-j-9.3.0.jar;\
+WebContent\WEB-INF\lib\javax.mail-1.6.2.jar;\
+WebContent\WEB-INF\lib\jakarta.activation-1.2.2.jar;\
+bin" \
   -d bin \
   src/com/scarletblog/model/*.java \
   src/com/scarletblog/dao/*.java \
@@ -189,7 +200,8 @@ cp -r WebContent/* "C:\Users\dxy28\tools\tomcat9\webapps\myblog\"
 ```
 
 > 💡 只改 JSP/CSS → 只需步骤 2+3（跳过编译）  
-> 💡 改 Java → 必须全部 3 步
+> 💡 改 Java → 必须全部 3 步  
+> ⚠️ Tomcat `conf/server.xml` Connector 需加 `maxPostSize="-1"`，否则默认 2MB 限制会导致视频上传被拒绝
 
 ## 9. 邮件配置
 

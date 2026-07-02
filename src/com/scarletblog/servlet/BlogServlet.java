@@ -1089,7 +1089,7 @@ public class BlogServlet extends HttpServlet {
         String path = req.getRequestURI().substring(req.getContextPath().length());
         String method = req.getMethod();
 
-        // PUT /api/admin/users/:id/role — 任命/解除管理员（仅馆主）
+        // PUT /api/admin/users/:id/role — 任命/解除管家（仅馆主，女仆长为永久身份不可升降）
         if (path.matches("/api/admin/users/\\d+/role") && "PUT".equals(method)) {
             String[] parts = path.split("/");
             int targetId = Integer.parseInt(parts[parts.length - 2]);
@@ -1107,9 +1107,27 @@ public class BlogServlet extends HttpServlet {
                 resp.getWriter().write("{\"success\":false,\"error\":\"该住人不存在。\"}");
                 return;
             }
+            // Tomcat 默认只解析 POST 请求体，PUT 需要手动读取
             String newRole = req.getParameter("role");
-            if (!"女仆长".equals(newRole) && !"住人".equals(newRole)) {
-                resp.getWriter().write("{\"success\":false,\"error\":\"无效的身份。仅可任命为女仆长或降为住人。\"}");
+            if (newRole == null) {
+                try {
+                    StringBuilder body = new StringBuilder();
+                    java.io.BufferedReader br = req.getReader();
+                    String line;
+                    while ((line = br.readLine()) != null) body.append(line);
+                    String raw = body.toString();
+                    if (raw.startsWith("role=")) {
+                        newRole = java.net.URLDecoder.decode(raw.substring(5), "UTF-8");
+                    }
+                } catch (Exception ignored) {}
+            }
+            // 女仆长是永久身份，不可升降
+            if ("女仆长".equals(targetUser.getRole())) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"女仆长是永久身份，不可升降。\"}");
+                return;
+            }
+            if (!"管家".equals(newRole) && !"住人".equals(newRole)) {
+                resp.getWriter().write("{\"success\":false,\"error\":\"无效的身份。仅可任命为管家或降为住人。\"}");
                 return;
             }
             if (newRole.equals(targetUser.getRole())) {
@@ -1120,7 +1138,7 @@ public class BlogServlet extends HttpServlet {
             String nick = targetUser.getNickname() != null ? targetUser.getNickname() : targetUser.getUsername();
             if (ok) {
                 resp.getWriter().write("{\"success\":true,\"message\":\"" + nick
-                    + ("女仆长".equals(newRole) ? " 已任命为女仆长！" : " 已降为住人。") + "\"}");
+                    + ("管家".equals(newRole) ? " 已任命为管家！" : " 已降为住人。") + "\"}");
             } else {
                 resp.getWriter().write("{\"success\":false,\"error\":\"任命失败，请稍后再试。\"}");
             }

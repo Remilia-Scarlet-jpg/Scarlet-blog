@@ -50,8 +50,8 @@ public class User {
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }
 
-    /** 是否是馆主或女仆长（管理员） */
+    /** 是否是馆主、女仆长或管家（管理员） */
     public boolean isAdmin() {
-        return "馆主".equals(role) || "女仆长".equals(role);
+        return "馆主".equals(role) || "女仆长".equals(role) || "管家".equals(role);
     }
 }
