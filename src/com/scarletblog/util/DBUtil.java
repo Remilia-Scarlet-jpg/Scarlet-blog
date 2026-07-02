@@ -408,6 +408,17 @@ public class DBUtil {
                 // 确保所有已注册用户都在公共茶室中
                 stmt.execute("INSERT IGNORE INTO chat_room_members (room_id, user_id) " +
                     "SELECT cr.id, u.id FROM chat_rooms cr CROSS JOIN users u WHERE cr.type = 'public'");
+
+                // ===== 2026-07-02 增量迁移：复合索引优化聊天轮询性能 =====
+                // 为 getRoomsForUser 的关联子查询 + getMessages 的 room_id 过滤添加索引
+                try {
+                    stmt.execute("ALTER TABLE messages ADD INDEX idx_room_id (room_id, id)");
+                    System.out.println("[DB] Added composite index: messages(room_id, id)");
+                } catch (SQLException e) { /* 已存在 */ }
+                try {
+                    stmt.execute("ALTER TABLE messages ADD INDEX idx_room_created (room_id, created_at)");
+                    System.out.println("[DB] Added composite index: messages(room_id, created_at)");
+                } catch (SQLException e) { /* 已存在 */ }
             }
 
         } catch (SQLException e) {

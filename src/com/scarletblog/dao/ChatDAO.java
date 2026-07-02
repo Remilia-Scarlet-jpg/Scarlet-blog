@@ -12,13 +12,15 @@ import java.util.List;
  */
 public class ChatDAO {
 
-    /** 获取用户的茶室列表（含最后消息预览） */
+    /** 获取用户的茶室列表（含最后消息预览）
+     *  优化：使用子查询 MAX(id) 替代 ORDER BY created_at DESC，
+     *  利用 InnoDB PK 索引快速定位每个 room 的最后消息 */
     public List<ChatRoom> getRoomsForUser(int userId) throws SQLException {
         List<ChatRoom> list = new ArrayList<>();
         String sql = "SELECT cr.*, " +
             "COUNT(DISTINCT m2.id) AS member_count, " +
-            "(SELECT content FROM messages WHERE room_id = cr.id ORDER BY created_at DESC LIMIT 1) AS last_message, " +
-            "(SELECT created_at FROM messages WHERE room_id = cr.id ORDER BY created_at DESC LIMIT 1) AS last_message_time " +
+            "(SELECT content FROM messages WHERE room_id = cr.id ORDER BY id DESC LIMIT 1) AS last_message, " +
+            "(SELECT created_at FROM messages WHERE room_id = cr.id ORDER BY id DESC LIMIT 1) AS last_message_time " +
             "FROM chat_rooms cr " +
             "JOIN chat_room_members crm ON cr.id = crm.room_id " +
             "LEFT JOIN chat_room_members m2 ON cr.id = m2.room_id " +

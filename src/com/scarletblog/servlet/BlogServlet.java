@@ -1609,6 +1609,38 @@ public class BlogServlet extends HttpServlet {
         String path = req.getRequestURI().substring(req.getContextPath().length());
         String method = req.getMethod();
 
+        // GET /api/chat/poll — 统一轮询端点：友人 + 茶室（一次请求替代原来的两路轮询）
+        if (path.equals("/api/chat/poll") && method.equals("GET")) {
+            // 友人
+            List<Friend> friends = friendDAO.getFriends(user.getId());
+            List<Friend> sent = friendDAO.getPendingSent(user.getId());
+            List<Friend> received = friendDAO.getPendingReceived(user.getId());
+            // 茶室
+            List<ChatRoom> rooms = chatDAO.getRoomsForUser(user.getId());
+
+            StringBuilder sb = new StringBuilder("{\"success\":true,");
+            sb.append("\"friends\":[").append(friendsToJson(friends, user.getId())).append("],");
+            sb.append("\"sent\":[").append(friendsToJson(sent, user.getId())).append("],");
+            sb.append("\"received\":[").append(friendsToJson(received, user.getId())).append("],");
+            sb.append("\"rooms\":[");
+            for (int i = 0; i < rooms.size(); i++) {
+                if (i > 0) sb.append(",");
+                ChatRoom r = rooms.get(i);
+                sb.append("{\"id\":").append(r.getId());
+                sb.append(",\"name\":\"").append(escapeJson(r.getName())).append("\"");
+                sb.append(",\"type\":\"").append(escapeJson(r.getType())).append("\"");
+                sb.append(",\"member_count\":").append(r.getMemberCount());
+                sb.append(",\"last_message\":").append(r.getLastMessage() != null ? "\"" + escapeJson(r.getLastMessage()) + "\"" : "null");
+                if (r.getLastMessageTime() != null) {
+                    sb.append(",\"last_message_time\":\"").append(r.getLastMessageTime().toString()).append("\"");
+                }
+                sb.append("}");
+            }
+            sb.append("]}");
+            resp.getWriter().write(sb.toString());
+            return;
+        }
+
         // GET /api/chat/rooms — 茶室列表
         if (path.equals("/api/chat/rooms") && method.equals("GET")) {
             List<ChatRoom> rooms = chatDAO.getRoomsForUser(user.getId());

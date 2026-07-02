@@ -133,33 +133,30 @@
         // 页面加载
         loadAll();
 
-        // 实时轮询（友人 2 秒，茶室 5 秒）
-        var pollFriendsTimer = setInterval(loadFriends, 2000);
-        var pollRoomsTimer = setInterval(loadRooms, 5000);
+        // 统一轮询：3 秒一次拉取友人 + 茶室（替代原来的 2s+5s 双路轮询）
+        var pollTimer = setInterval(loadAll, 3000);
 
         // 离开页面时停止轮询
         window.addEventListener('beforeunload', function() {
-            clearInterval(pollFriendsTimer);
-            clearInterval(pollRoomsTimer);
+            clearInterval(pollTimer);
         });
 
         function loadAll() {
-            loadFriends();
-            loadRooms();
-        }
-
-        // ===== 友人 =====
-        function loadFriends() {
-            fetchSafe(API_BASE + '/friends', 1, 1500)
+            fetchSafe(API_BASE + '/chat/poll', 2, 1000)
                 .then(function(d) {
                     if (!d.success) return;
                     connectionFailedWarned = false;
                     renderFriends(d.friends);
                     renderReceived(d.received);
                     renderSent(d.sent);
+                    // 茶室
+                    var pub = d.rooms.filter(function(r) { return r.type === 'public'; });
+                    var priv = d.rooms.filter(function(r) { return r.type === 'private'; });
+                    renderRoomList('publicRooms', pub, '暂无公共茶室');
+                    renderRoomList('privateRooms', priv, '添加友人后，私人茶室将自动创建~');
                 })
                 .catch(function(e) {
-                    console.error(e);
+                    console.error('Poll failed:', e);
                     if (!connectionFailedWarned) {
                         connectionFailedWarned = true;
                         showToast('⚠️ 连接不稳定，自动重试中...', 'error');
@@ -278,7 +275,7 @@
                 return r.json();
             })
             .then(function(d) {
-                if (d.success) { showToast(d.message, 'success'); input.value = ''; loadFriends(); }
+                if (d.success) { showToast(d.message, 'success'); input.value = ''; loadAll(); }
                 else { showToast(d.error, 'error'); }
             })
             .catch(function(e) {
@@ -330,7 +327,7 @@
             .then(function(d) {
                 if (d.success) {
                     showToast(d.message, 'success');
-                    loadFriends(); // 刷新邀请列表
+                    loadAll(); // 刷新邀请列表
                 } else {
                     showToast(d.error, 'error');
                     if (item) item.style.opacity = '1';
@@ -351,17 +348,7 @@
                 });
         }
 
-        // ===== 茶室 =====
-        function loadRooms() {
-            fetchSafe(API_BASE + '/chat/rooms', 1, 1500)
-                .then(function(d) {
-                    if (!d.success) return;
-                    var pub = d.data.filter(function(r) { return r.type === 'public'; });
-                    var priv = d.data.filter(function(r) { return r.type === 'private'; });
-                    renderRoomList('publicRooms', pub, '暂无公共茶室');
-                    renderRoomList('privateRooms', priv, '添加友人后，私人茶室将自动创建~');
-                }).catch(function(e) { console.error('loadRooms failed:', e); });
-        }
+        // ===== 茶室（渲染逻辑，数据由 loadAll 统一获取）=====
 
         function renderRoomList(id, rooms, emptyMsg) {
             var el = document.getElementById(id);
@@ -427,7 +414,7 @@
             })
             .then(r => r.json())
             .then(d => {
-                if (d.success) { showToast(d.message, 'success'); document.getElementById('newRoomName').value = ''; loadRooms(); }
+                if (d.success) { showToast(d.message, 'success'); document.getElementById('newRoomName').value = ''; loadAll(); }
                 else { showToast(d.error, 'error'); }
             });
         }
