@@ -71,11 +71,14 @@ myblog-src/
 
 | 角色 | 权限 |
 |------|------|
-| 馆主 (remilia) | 全部权限：管理文章/分类/轮播图/用户/任命管理员 |
-| 女仆长 (sakuya) | 管理员：文章/分类/轮播图 CRUD，查看用户列表 |
+| 馆主 (remilia) | 全部权限：管理文章/分类/轮播图/用户/任命管家 |
+| 女仆长 (sakuya) | 🔒永久身份，不可升降。管理员：文章/分类/轮播图 CRUD |
+| 管家 | 管理员：文章/分类/轮播图 CRUD。可由馆主任命/解除 |
 | 住人 (默认) | 发布文章、评论、茶话会、个人主页编辑 |
 
-`User.isAdmin()` = `"馆主".equals(role) || "女仆长".equals(role)`
+`User.isAdmin()` = `"馆主".equals(role) || "女仆长".equals(role) || "管家".equals(role)`
+
+**升降规则**：仅馆主可操作。住人 ↔ 管家（可升降）。女仆长为永久身份，不可升降。
 
 ## 5. API 路由一览
 
@@ -105,7 +108,7 @@ myblog-src/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/admin/users` | 用户列表（管理员） |
-| PUT | `/api/admin/users/:id/role` | 任命/解除管理员（仅馆主） |
+| PUT | `/api/admin/users/:id/role` | 任命/解除管家（仅馆主。女仆长永久不可升降） |
 | GET/POST/PUT/DELETE | `/api/admin/carousel` | 轮播图 CRUD |
 | PUT | `/api/admin/carousel/:id/sort` | 轮播图排序 |
 
@@ -164,6 +167,16 @@ myblog-src/
 - 邮箱验证落地页
 - 双模式发邮件：本地 QQ SMTP / 云端 Resend HTTP API
 - 依赖：javax.mail-1.6.2.jar + jakarta.activation-1.2.2.jar
+
+### v6 — 身份体系重构 + 管家角色 (7/2)
+- 女仆长改为永久身份（sakuya），前后端双重拦截不可升降
+- 新增「管家」角色：住人 ↔ 管家 可互相升降
+- 管家拥有管理员权限（`isAdmin()` 纳入管家）
+- 修复 PUT 升降职位 `req.getParameter("role")` 返回 null（Tomcat 默认只解析 POST body）
+  - 根因：前端发 PUT 请求，Tomcat `parseBodyMethods` 默认仅 "POST"
+  - 修复：PUT 请求时手动从 `req.getReader()` 读取请求体解析 role 参数
+- 管家登录后跳转管理室（login.jsp / register.jsp 角色判断纳入管家）
+- 提交 53e6e4f, 2d1b9ac
 
 ### v5 — 轮播图视频上传修复 (6/19)
 - 修复：上传视频点保存无响应
