@@ -264,7 +264,7 @@
                     // 2秒后按角色跳转
                     setTimeout(function() {
                         var role = data.data && data.data.role;
-                        if (role === '馆主' || role === '女仆长') {
+                        if (role === '馆主' || role === '女仆长' || role === '管家') {
                             window.location.href = '<%=ctxPath%>/blog/admin';
                         } else {
                             window.location.href = '<%=ctxPath%>/blog';

@@ -226,7 +226,7 @@
                 if (data.success) {
                     // 登录成功，按角色跳转
                     var role = data.data && data.data.role;
-                    if (role === '馆主' || role === '女仆长') {
+                    if (role === '馆主' || role === '女仆长' || role === '管家') {
                         window.location.href = '<%=ctxPath%>/blog/admin';
                     } else {
                         window.location.href = '<%=ctxPath%>/blog';

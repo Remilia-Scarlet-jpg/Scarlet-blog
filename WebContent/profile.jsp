@@ -482,7 +482,7 @@
                     </div>
                     <div class="profile-stats">
                         <div class="profile-stat">
-                            <div class="profile-stat-value"><%= currentUser.getRole().equals("馆主") || currentUser.getRole().equals("女仆长") ? "👑" : "🏠" %></div>
+                            <div class="profile-stat-value"><%= currentUser.getRole().equals("馆主") || currentUser.getRole().equals("女仆长") || currentUser.getRole().equals("管家") ? "👑" : "🏠" %></div>
                             <div class="profile-stat-label"><%= HtmlUtil.escape(currentUser.getRole()) %></div>
                         </div>
                         <div class="profile-stat">
